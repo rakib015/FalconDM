@@ -1,0 +1,9 @@
+{
+  "name": "com.falcondm.downloader",
+  "description": "FalconDM Native Messaging Host for Firefox Auto-Launching",
+  "path": "native_host.bat",
+  "type": "stdio",
+  "allowed_extensions": [
+    "falcondm-turbo@falcondm.local"
+  ]
+}

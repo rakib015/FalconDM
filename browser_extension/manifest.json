@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "FalconDM - Turbo Download Accelerator",
+  "version": "2.0",
+  "description": "Universal Browser Integration: Right-click download, auto-capture downloads, and floating Video Grabber for FalconDM (Chrome, Edge, Firefox, Brave, Opera, Arc).",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApcPE0LC4s3mhXexhrtE83D6b5AGRlfLVKtmtM7NMUw5bze3eXvDpVWjqKB+v4H0Nd2L7Or8Zz5K2S2ypI5Ptkw2eK53i7tmtPrp2UBAi17g0jI2ff7Ey3UxOvwFkSM1ByhQYxgQZmaajn5g55VFJA+kBL6K6iK0RAMASyuPlE6nS1s5eNaw5fq0k+pjt6ZRRtFpcUT5d6Hu8XO3zkAuMn2ZXNVKZcv7YzPqIhGJOE1tjYlNX9jiYYwcSC0vNaWfHblr9XJDk1CEL4wxBQ9VSM76OyAaapkuuQuPXfekCPbwAQYgLzbaqUQhxEFO4eRSfukvdEVttl0MB+Fy9hN5V7wIDAQAB",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "falcondm-turbo@falcondm.local",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "tabs",
+    "cookies",
+    "downloads",
+    "storage",
+    "nativeMessaging",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_title": "FalconDM Downloader",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}

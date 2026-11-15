@@ -1,0 +1,59 @@
+# =====================================================================
+# FalconDM - .gitignore
+# Prevents personal data, credentials, logs, and heavy binaries
+# from being committed to GitHub.
+# =====================================================================
+
+# --- User Data, Credentials & Personal History ---
+downloads.json
+falcon_settings.json
+site_credentials.json
+*.log
+falcondm_downloads.log
+startup.log
+startup_err.log
+
+# --- Temporary Files & Download Chunks ---
+temp_*
+*.tmp
+*.part
+*.crdownload
+
+# --- Python Cache & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Build Outputs & Binary Installers (Upload to GitHub Releases) ---
+build/
+dist/
+dist_installer/
+*.exe
+*.msi
+*.bin
+*.spec.bak
+
+# --- Environment & Secret Keys ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+browser_extension/key.pem
+
+# --- IDE & OS Files ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db

@@ -1,0 +1,10 @@
+{
+  "name": "com.falcondm.downloader",
+  "description": "FalconDM Native Messaging Host for Auto-Launching",
+  "path": "native_host.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://kbekmfgcpjeiiiehpffkapbpncbpfjcj/",
+    "chrome-extension://*/*"
+  ]
+}
