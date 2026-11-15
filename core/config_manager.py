@@ -33,10 +33,17 @@ class ConfigManager:
     config_path: str = "falcon_settings.json"
     settings: Dict[str, Any] = {}
 
-    def __new__(cls, config_path: str = "falcon_settings.json"):
+    def __new__(cls, config_path: Optional[str] = None):
         if cls._instance is None:
             cls._instance = super(ConfigManager, cls).__new__(cls)
-            cls._instance.config_path = config_path
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if not config_path:
+                resolved_path = os.path.join(base_dir, "falcon_settings.json")
+            elif not os.path.isabs(config_path):
+                resolved_path = os.path.join(base_dir, config_path)
+            else:
+                resolved_path = config_path
+            cls._instance.config_path = resolved_path
             cls._instance.settings = DEFAULT_SETTINGS.copy()
             cls._instance.load()
         return cls._instance

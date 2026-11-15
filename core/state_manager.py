@@ -32,8 +32,14 @@ def detect_category(filename: str) -> str:
 
 
 class DownloadManager:
-    def __init__(self, data_file: str = "downloads.json", max_concurrent: int = 3):
-        self.data_file = data_file
+    def __init__(self, data_file: Optional[str] = None, max_concurrent: int = 3):
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if not data_file:
+            self.data_file = os.path.join(base_dir, "downloads.json")
+        elif not os.path.isabs(data_file):
+            self.data_file = os.path.join(base_dir, data_file)
+        else:
+            self.data_file = data_file
         self.max_concurrent = max_concurrent
         self.tasks: Dict[str, DownloadTask] = {}
         self.lock = threading.RLock()

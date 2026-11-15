@@ -2,6 +2,8 @@
 
 **FalconDM** is a high-speed, feature-packed, 100% free download accelerator, media grabber, and multi-protocol bridge built from the ground up to match and exceed the capabilities of Internet Download Manager (IDM), aria2, JDownloader 2, and Motrix.
 
+![FalconDM v2.8.0 UI Preview](assets/ui_preview.png)
+
 ---
 
 ## 🌟 What Makes FalconDM Better Than IDM?
