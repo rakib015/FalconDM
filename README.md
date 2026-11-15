@@ -1,4 +1,14 @@
-# ⚡ FalconDM v2.8.0 — The Ultimate Free & Open-Source IDM Alternative
+<div align="center">
+  <img src="assets/logo.png" alt="FalconDM Logo" width="180"/>
+  <h1>⚡ FalconDM v2.8.0</h1>
+  <p><strong>The Ultimate Free & Open-Source IDM Alternative</strong></p>
+  <p>
+    <a href="https://github.com/rakib015/FalconDM/releases/tag/v2.8.0"><img src="https://img.shields.io/badge/release-v2.8.0-blue.svg" alt="Release"></a>
+    <img src="https://img.shields.io/badge/license-GPLv3%20%2F%20MIT-emerald.svg" alt="License">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational.svg" alt="Platform">
+    <img src="https://img.shields.io/badge/python-3.10%2B-brightgreen.svg" alt="Python">
+  </p>
+</div>
 
 **FalconDM** is a high-speed, feature-packed, 100% free download accelerator, media grabber, and multi-protocol bridge built from the ground up to match and exceed the capabilities of Internet Download Manager (IDM), aria2, JDownloader 2, and Motrix.
 
