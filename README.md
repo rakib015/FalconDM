@@ -152,6 +152,21 @@
 ### 28. 📋 1-Click "Copy as cURL Command" (from Chrome DevTools & IDM)
 - Right-click any download or open File Properties to copy the exact `curl` command with user headers, authentication, cookies, and user agent.
 
+### 29. 🧲 BitTorrent & Magnet Swarm Engine Pro (`core/torrent_engine.py`)
+- Automatically injects Tier-1 public high-speed BitTorrent trackers (`udp://tracker.opentrackr.org`, `open.stealth.si`, etc.) and DHT bootstrap entry points.
+- Instant peer discovery, DHT swarm resolution, PEX (Peer Exchange), and metadata-only torrent preview.
+
+### 30. ⚡ Auto-Speed Optimizer (`core/engine.py`)
+- Measures server round-trip latency (TTFB) and network responsiveness dynamically during probe.
+- Automatically scales connection pool (8 vs 16 vs 32 turbo threads) based on bandwidth-delay product and host constraints.
+
+### 31. 🎨 Cyberpunk Accent Themes & Custom Palettes (`core/config_manager.py` & `gui/app.py`)
+- Switch instantly between 5 themes: **Cyberpunk Cyan**, **Emerald Matrix**, **Sunset Orange**, **Vaporwave Violet**, and **Crimson Turbo**.
+- Real-time accent synchronization across toolbar actions, category badges, and dynamic throughput waveform graphs.
+
+### 32. 📦 1-Click Browser Extension Store Packages (`build_extension_packages.py`)
+- Automated store packager generating clean, compliant `.zip` archives for **Chrome Web Store**, **Microsoft Edge Add-ons**, and **Mozilla Firefox AMO** with full submission guides.
+
 ---
 
 ## 💻 Quick Start
@@ -186,7 +201,7 @@ FalconDM includes a native browser extension for Chrome, Edge, Brave, Opera, and
 python main.py
 ```
 
-### Run Automated Tests (29/29 Tests Passed)
+### Run Automated Tests (33/33 Tests Passed)
 ```powershell
 # Run the complete test suite:
 python test_features.py

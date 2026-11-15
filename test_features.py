@@ -460,6 +460,81 @@ class TestFalconDMEnhancements(unittest.TestCase):
         if os.path.exists(test_path):
             os.remove(test_path)
 
+    def test_torrent_engine_trackers_and_dht(self):
+        from core.torrent_engine import TorrentEngine, PUBLIC_TRACKERS, DHT_BOOTSTRAP_NODES
+        self.assertGreaterEqual(len(PUBLIC_TRACKERS), 6)
+        self.assertGreaterEqual(len(DHT_BOOTSTRAP_NODES), 2)
+        
+        magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=TestPayload"
+        enhanced = TorrentEngine.enhance_magnet_link(magnet)
+        self.assertIn("tr=udp", enhanced)
+        self.assertIn("dn=TestPayload", enhanced)
+
+        # Test command building with metadata-only mode
+        cmd = TorrentEngine.build_aria2_command(magnet, "C:\\TestDir", metadata_only=True)
+        self.assertIn("--bt-metadata-only=true", cmd)
+        self.assertIn("--enable-dht=true", cmd)
+
+    def test_auto_speed_optimizer(self):
+        from core.engine import DownloadTask
+        # High-speed connection probe with low latency & large file -> scales to 32 connections
+        task_fast = DownloadTask("opt_fast", "http://example.com/big.iso", "big.iso", num_connections=8)
+        task_fast.file_size = 80 * 1024 * 1024
+        task_fast.resumable = True
+        task_fast._apply_auto_speed_optimization(latency_ms=35.0)
+        self.assertEqual(task_fast.num_connections, 32)
+
+        # Medium latency & medium file -> scales to 16 connections
+        task_med = DownloadTask("opt_med", "http://example.com/med.zip", "med.zip", num_connections=8)
+        task_med.file_size = 12 * 1024 * 1024
+        task_med.resumable = True
+        task_med._apply_auto_speed_optimization(latency_ms=130.0)
+        self.assertEqual(task_med.num_connections, 16)
+
+        # Non-resumable host -> locks to 1 connection
+        task_single = DownloadTask("opt_single", "http://example.com/live.stream", "live.stream", num_connections=8)
+        task_single.file_size = 0
+        task_single.resumable = False
+        task_single._apply_auto_speed_optimization(latency_ms=20.0)
+        self.assertEqual(task_single.num_connections, 1)
+
+    def test_theme_palettes_and_custom_accents(self):
+        from core.config_manager import THEME_PALETTES, config_store
+        expected_themes = ["Cyberpunk Cyan", "Emerald Matrix", "Sunset Orange", "Vaporwave Violet", "Crimson Turbo"]
+        for theme in expected_themes:
+            self.assertIn(theme, THEME_PALETTES)
+            palette = THEME_PALETTES[theme]
+            self.assertIn("primary", palette)
+            self.assertIn("accent", palette)
+            self.assertIn("graph_fill", palette)
+            self.assertIn("graph_line", palette)
+
+        # Test settings persistence
+        config_store.set("ui_theme_accent", "Emerald Matrix")
+        self.assertEqual(config_store.get("ui_theme_accent"), "Emerald Matrix")
+        config_store.set("ui_theme_accent", "Cyberpunk Cyan")
+
+    def test_browser_extension_packaging(self):
+        from build_extension_packages import build_extension_packages
+        build_extension_packages()
+        out_dir = os.path.join(_ROOT, "dist_extension")
+        chrome_zip = os.path.join(out_dir, "FalconDM-Chrome-WebStore-v2.8.0.zip")
+        firefox_zip = os.path.join(out_dir, "FalconDM-Firefox-AMO-v2.8.0.zip")
+        guide_file = os.path.join(out_dir, "SUBMISSION_GUIDE.md")
+
+        self.assertTrue(os.path.isfile(chrome_zip))
+        self.assertTrue(os.path.isfile(firefox_zip))
+        self.assertTrue(os.path.isfile(guide_file))
+        self.assertGreater(os.path.getsize(chrome_zip), 1000)
+        self.assertGreater(os.path.getsize(firefox_zip), 1000)
+
+        # Verify manifest inside Chrome zip has no gecko settings
+        import zipfile
+        with zipfile.ZipFile(chrome_zip, "r") as z:
+            manifest_str = z.read("manifest.json").decode("utf-8")
+            self.assertNotIn("browser_specific_settings", manifest_str)
+            self.assertNotIn('"key"', manifest_str)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

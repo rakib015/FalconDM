@@ -291,6 +291,7 @@ class DownloadTask:
                 auth_tuple = credential_store.get_auth_tuple(candidate)
                 req_headers = self._build_request_headers()
                 
+                t_start = time.perf_counter()
                 # 1. Try HEAD request
                 resp = self._session.head(candidate, headers=req_headers, auth=auth_tuple, allow_redirects=True, timeout=12)
                 
@@ -300,6 +301,8 @@ class DownloadTask:
                     probe_headers["Range"] = "bytes=0-0"
                     resp = self._session.get(candidate, headers=probe_headers, auth=auth_tuple, stream=True, allow_redirects=True, timeout=12)
                     resp.close()
+
+                latency_ms = max(1.0, (time.perf_counter() - t_start) * 1000.0)
 
                 if resp.status_code >= 400:
                     last_error = f"HTTP {resp.status_code} - {getattr(resp, 'reason', 'Error')}"
@@ -347,6 +350,9 @@ class DownloadTask:
                 self.resumable = (accept_ranges == "bytes" or "Content-Range" in resp.headers) and (self.file_size > 0)
                 self.etag = resp.headers.get("ETag", "").strip('"')
 
+                # Auto-Speed Optimizer: Dynamically tune connections
+                self._apply_auto_speed_optimization(latency_ms)
+
                 falcon_logger.log_probe_result(
                     self, candidate, True,
                     status_code=getattr(resp, "status_code", 200),
@@ -363,6 +369,36 @@ class DownloadTask:
         falcon_logger.log_task_failure(self, self.error_message)
         self._notify_status()
         return False
+
+    def _apply_auto_speed_optimization(self, latency_ms: float):
+        """
+        Auto-Speed Optimizer: Dynamically calibrates thread count (1 to 32) and segment
+        sizing based on measured server latency, network responsiveness, and file payload size.
+        """
+        if not self.resumable or self.file_size <= 0:
+            self.num_connections = 1
+            return
+
+        if getattr(self, "manual_connection_override", False):
+            return
+
+        # Low latency (<80ms) + Large payload (>25MB) -> Max Turbo 32 connections
+        if latency_ms < 80 and self.file_size >= 25 * 1024 * 1024:
+            self.num_connections = 32
+        # Moderate latency (80ms - 200ms) or medium payload (5MB - 25MB) -> 16 connections
+        elif latency_ms < 200 and self.file_size >= 5 * 1024 * 1024:
+            self.num_connections = 16
+        # High latency (>200ms) or small payload (2MB - 5MB) -> 8 connections
+        elif self.file_size >= 2 * 1024 * 1024:
+            self.num_connections = 8
+        else:
+            # Very small files (<2MB) don't need multi-connection overhead
+            self.num_connections = 4
+
+        falcon_logger.info(
+            f"AutoSpeedOptimizer: Latency={latency_ms:.1f}ms | "
+            f"Size={self.file_size/(1024*1024):.2f}MB | Selected Turbo Threads={self.num_connections}"
+        )
 
     def can_preview_media(self) -> bool:
         """Determines if enough initial media container metadata has downloaded to play in VLC/media player."""

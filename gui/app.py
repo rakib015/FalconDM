@@ -30,7 +30,7 @@ try:
     from ..core.torrent_engine import TorrentEngine
     from ..core.converter import MediaConverter
     from ..core.credential_manager import credential_store
-    from ..core.config_manager import config_store
+    from ..core.config_manager import config_store, THEME_PALETTES
     from ..core.notifications import notification_manager
     from ..core.tray_icon import FalconTrayIcon
     from ..core.antivirus_scanner import AntivirusScanner
@@ -75,7 +75,7 @@ except (ImportError, ValueError):
     from core.torrent_engine import TorrentEngine
     from core.converter import MediaConverter
     from core.credential_manager import credential_store
-    from core.config_manager import config_store
+    from core.config_manager import config_store, THEME_PALETTES
     from core.notifications import notification_manager
     from core.tray_icon import FalconTrayIcon
     from core.antivirus_scanner import AntivirusScanner
@@ -845,6 +845,26 @@ class FalconDMApp(ctk.CTk):
         self._build_segment_panel()
         self._build_statusbar()
 
+    def get_theme_palette(self) -> Dict[str, str]:
+        theme_name = config_store.get("ui_theme_accent", "Cyberpunk Cyan")
+        return THEME_PALETTES.get(theme_name, THEME_PALETTES["Cyberpunk Cyan"])
+
+    def apply_theme_accent(self, theme_name: Optional[str] = None):
+        """Dynamically applies active accent color palette across toolbar buttons, graphs, and UI accents."""
+        if theme_name:
+            config_store.set("ui_theme_accent", theme_name)
+        palette = self.get_theme_palette()
+        if hasattr(self, "btn_add"):
+            self.btn_add.configure(
+                fg_color=palette["primary"],
+                hover_color=palette["primary_hover"],
+                border_color=palette["accent"]
+            )
+        if hasattr(self, "header_speed_lbl"):
+            self.header_speed_lbl.configure(text_color=palette["accent"])
+        self._refresh_table()
+        self._draw_speed_graph()
+
     def _build_header_bar(self):
         header = ctk.CTkFrame(self, fg_color="#0b0f19", height=54, corner_radius=12, border_width=1, border_color="#1e293b")
         header.pack(fill="x", padx=12, pady=(10, 6))
@@ -953,22 +973,24 @@ class FalconDMApp(ctk.CTk):
         toolbar.pack(fill="x", padx=12, pady=(0, 6))
         toolbar.pack_propagate(False)
 
+        palette = self.get_theme_palette()
+
         # 1. Primary Action: Add URL
-        btn_add = ctk.CTkButton(
+        self.btn_add = ctk.CTkButton(
             toolbar,
             text="➕ New Download",
             width=145,
             height=34,
             corner_radius=8,
-            fg_color="#4f46e5",
-            hover_color="#4338ca",
+            fg_color=palette["primary"],
+            hover_color=palette["primary_hover"],
             border_width=1,
-            border_color="#6366f1",
+            border_color=palette["accent"],
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#ffffff",
             command=self._on_click_add_url
         )
-        btn_add.pack(side="left", padx=(8, 6), pady=8)
+        self.btn_add.pack(side="left", padx=(8, 6), pady=8)
 
         # 2. Core Task Controls with modern semantic hues
         self.btn_resume = ctk.CTkButton(
@@ -1159,6 +1181,7 @@ class FalconDMApp(ctk.CTk):
         menu.add_command(label="🛡️ AI Threat & Deception Shield", command=self._on_ai_threat_scan)
         menu.add_separator()
         menu.add_command(label="📥 Import Metalink File (.meta4/.metalink)...", command=self._on_import_metalink)
+        menu.add_command(label="📦 Build Extension Store Packages (.zip)...", command=self._on_build_extension_packages)
         menu.add_separator()
         menu.add_command(label="📜 View Download Diagnostics & Error Logs", command=self._open_log_viewer)
         menu.add_command(label="ℹ️ About FalconDM v2.8.0", command=self._show_about_dialog)
@@ -1835,6 +1858,7 @@ class FalconDMApp(ctk.CTk):
             AISecurityDialog(self, target_path)
 
     def _on_settings_applied(self):
+        self.apply_theme_accent()
         self.clipboard_sniff_enabled.set(config_store.get("clipboard_sniff_enabled", True))
         if hasattr(self, 'watcher'):
             self.watcher.enabled = self.clipboard_sniff_enabled.get()
@@ -2426,6 +2450,24 @@ class FalconDMApp(ctk.CTk):
             messagebox.showinfo("Metalink Imported", f"Successfully imported {count} download task(s) with multi-mirror acceleration!")
         except Exception as e:
             messagebox.showerror("Metalink Error", f"Failed to parse Metalink file:\n{e}")
+
+    def _on_build_extension_packages(self):
+        """Generates validated .zip packages for Chrome Web Store, Edge Add-ons, and Firefox AMO."""
+        try:
+            from build_extension_packages import build_extension_packages
+            build_extension_packages()
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            out_dir = os.path.join(base_dir, "dist_extension")
+            messagebox.showinfo(
+                "Store Packages Ready",
+                f"Browser Extension store packages created successfully in:\n{out_dir}\n\n"
+                f"• FalconDM-Chrome-WebStore.zip (Chrome, Edge, Brave, Opera)\n"
+                f"• FalconDM-Firefox-AMO.zip (Firefox AMO)\n"
+                f"• SUBMISSION_GUIDE.md (Step-by-step submission checklist)"
+            )
+            open_file_or_folder(out_dir)
+        except Exception as err:
+            messagebox.showerror("Packaging Error", f"Failed to generate extension packages:\n{err}")
 
     def _on_copy_curl_command(self):
         if not self.selected_task_id:
@@ -3042,17 +3084,18 @@ class FalconDMApp(ctk.CTk):
                 points.append((x, y))
 
             if len(points) >= 2:
+                palette = self.get_theme_palette()
                 # Gradient fill under curve
                 poly = [pad_left, pad_top + plot_h]
                 for pt in points:
                     poly.extend(pt)
                 poly.extend([pad_left + plot_w, pad_top + plot_h])
-                c_main.create_polygon(poly, fill="#0c1d38", outline="")
+                c_main.create_polygon(poly, fill=palette.get("graph_fill", "#0c1d38"), outline="")
 
                 # Neon cyber strokes
                 flat_pts = [coord for pt in points for coord in pt]
-                c_main.create_line(flat_pts, fill="#1d4ed8", width=4, smooth=True)
-                c_main.create_line(flat_pts, fill="#38bdf8", width=2, smooth=True)
+                c_main.create_line(flat_pts, fill=palette.get("primary", "#1d4ed8"), width=4, smooth=True)
+                c_main.create_line(flat_pts, fill=palette.get("graph_line", "#38bdf8"), width=2, smooth=True)
 
                 # Peak speed dashed line
                 peak_y = (pad_top + plot_h) - (plot_h)

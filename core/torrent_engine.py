@@ -5,7 +5,28 @@ import shutil
 import subprocess
 import threading
 import urllib.parse
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, List
+
+# Curated Tier-1 Public High-Speed BitTorrent Trackers
+PUBLIC_TRACKERS: List[str] = [
+    "udp://tracker.opentrackr.org:1337/announce",
+    "udp://open.stealth.si:80/announce",
+    "udp://tracker.torrent.eu.org:451/announce",
+    "udp://tracker.bittor.pw:1337/announce",
+    "udp://public.tracker.vraphim.com:6969/announce",
+    "udp://opentracker.i2p.rocks:6969/announce",
+    "udp://tracker.moeking.me:6969/announce",
+    "http://tracker.openbittorrent.com:80/announce",
+    "udp://explodie.org:6969/announce"
+]
+
+# Standard DHT Bootstrap Entry Points
+DHT_BOOTSTRAP_NODES: List[str] = [
+    "router.bittorrent.com:6881",
+    "dht.transmissionbt.com:6881",
+    "router.utorrent.com:6881",
+    "dht.libtorrent.org:25401"
+]
 
 class TorrentEngine:
     """High-speed BitTorrent & Magnet Link Engine (IDM lacks this — FalconDM exclusive)."""
@@ -63,6 +84,70 @@ class TorrentEngine:
         return "Torrent_Download"
 
     @classmethod
+    def enhance_magnet_link(cls, magnet_url: str) -> str:
+        """
+        Injects Tier-1 public high-speed trackers into magnet query parameters to drastically
+        accelerate initial peer discovery and DHT swarm resolution.
+        """
+        if not magnet_url.startswith("magnet:?"):
+            return magnet_url
+
+        try:
+            parsed = urllib.parse.urlparse(magnet_url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            existing_trackers = set(qs.get("tr", []))
+            
+            # Merge existing and public trackers
+            for t in PUBLIC_TRACKERS:
+                existing_trackers.add(t)
+
+            qs["tr"] = list(existing_trackers)
+            new_query = urllib.parse.urlencode(qs, doseq=True)
+            return f"magnet:?{new_query}"
+        except Exception:
+            return magnet_url
+
+    @classmethod
+    def build_aria2_command(
+        cls,
+        source: str,
+        save_dir: str,
+        max_peers: int = 80,
+        metadata_only: bool = False
+    ) -> List[str]:
+        """Constructs optimized aria2c CLI command with DHT, PEX, and public tracker injection."""
+        aria2_bin = cls.get_aria2_path() or "aria2c"
+        
+        # If magnet link, auto-enhance with trackers
+        if source.startswith("magnet:?"):
+            source = cls.enhance_magnet_link(source)
+
+        cmd = [
+            aria2_bin,
+            source,
+            f"--dir={save_dir}",
+            "--enable-dht=true",
+            "--enable-dht6=true",
+            "--enable-peer-exchange=true",
+            "--bt-enable-lpd=true",
+            f"--bt-max-peers={max_peers}",
+            f"--bt-tracker={','.join(PUBLIC_TRACKERS[:6])}",
+            f"--dht-entry-point={DHT_BOOTSTRAP_NODES[0]}",
+            f"--dht-entry-point6={DHT_BOOTSTRAP_NODES[0]}",
+            "--bt-request-peer-speed-limit=250K",
+            "--seed-time=0",
+            "--summary-interval=1",
+            "--console-log-level=warn",
+            "--show-console-readout=true"
+        ]
+        
+        if metadata_only:
+            cmd.append("--bt-metadata-only=true")
+            cmd.append("--bt-save-metadata=true")
+
+        return cmd
+
+    @classmethod
     def download_torrent(
         cls,
         source: str,
@@ -80,19 +165,7 @@ class TorrentEngine:
             return False
 
         os.makedirs(save_dir, exist_ok=True)
-
-        cmd = [
-            aria2_bin,
-            source,
-            f"--dir={save_dir}",
-            "--enable-dht=true",
-            "--bt-enable-lpd=true",
-            "--bt-max-peers=55",
-            "--seed-time=0",
-            "--summary-interval=1",
-            "--console-log-level=warn",
-            "--show-console-readout=true"
-        ]
+        cmd = cls.build_aria2_command(source, save_dir)
 
         try:
             proc = subprocess.Popen(
@@ -155,3 +228,36 @@ class TorrentEngine:
             if progress_hook:
                 progress_hook({"status": "error", "error": str(e)})
             return False
+
+    @classmethod
+    def fetch_torrent_metadata(cls, magnet_url: str, save_dir: str, timeout_sec: int = 45) -> Optional[str]:
+        """
+        Connects to DHT / trackers and downloads only the .torrent metadata file without downloading payload.
+        Returns the path to the downloaded .torrent file on success.
+        """
+        aria2_bin = cls.get_aria2_path()
+        if not aria2_bin or not magnet_url.startswith("magnet:?"):
+            return None
+
+        os.makedirs(save_dir, exist_ok=True)
+        cmd = cls.build_aria2_command(magnet_url, save_dir, metadata_only=True)
+        cmd.append(f"--bt-stop-timeout={timeout_sec}")
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+            )
+            proc.wait(timeout=timeout_sec + 5)
+            # Find generated .torrent file in save_dir
+            for f in os.listdir(save_dir):
+                if f.endswith(".torrent"):
+                    return os.path.join(save_dir, f)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return None

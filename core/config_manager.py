@@ -24,7 +24,57 @@ DEFAULT_SETTINGS = {
     "telegram_allowed_chat_ids": [],
     "auto_upload_enabled": False,
     "auto_upload_telegram_chat_id": "",
-    "auto_upload_delete_local": False
+    "auto_upload_delete_local": False,
+    "ui_theme_accent": "Cyberpunk Cyan",
+    "auto_speed_optimizer": True
+}
+
+THEME_PALETTES: Dict[str, Dict[str, str]] = {
+    "Cyberpunk Cyan": {
+        "primary": "#0284c7",
+        "primary_hover": "#0369a1",
+        "accent": "#38bdf8",
+        "badge_bg": "#082f49",
+        "badge_text": "#38bdf8",
+        "graph_fill": "#082f49",
+        "graph_line": "#38bdf8"
+    },
+    "Emerald Matrix": {
+        "primary": "#059669",
+        "primary_hover": "#047857",
+        "accent": "#10b981",
+        "badge_bg": "#064e3b",
+        "badge_text": "#34d399",
+        "graph_fill": "#064e3b",
+        "graph_line": "#10b981"
+    },
+    "Sunset Orange": {
+        "primary": "#ea580c",
+        "primary_hover": "#c2410c",
+        "accent": "#f97316",
+        "badge_bg": "#431407",
+        "badge_text": "#fb923c",
+        "graph_fill": "#451a03",
+        "graph_line": "#f97316"
+    },
+    "Vaporwave Violet": {
+        "primary": "#7c3aed",
+        "primary_hover": "#6d28d9",
+        "accent": "#a855f7",
+        "badge_bg": "#3b0764",
+        "badge_text": "#c084fc",
+        "graph_fill": "#3b0764",
+        "graph_line": "#a855f7"
+    },
+    "Crimson Turbo": {
+        "primary": "#dc2626",
+        "primary_hover": "#b91c1c",
+        "accent": "#f43f5e",
+        "badge_bg": "#450a0a",
+        "badge_text": "#fb7185",
+        "graph_fill": "#4c0519",
+        "graph_line": "#f43f5e"
+    }
 }
 
 class ConfigManager:

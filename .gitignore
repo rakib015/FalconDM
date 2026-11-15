@@ -35,6 +35,7 @@ venv.bak/
 build/
 dist/
 dist_installer/
+dist_extension/
 *.exe
 *.msi
 *.bin

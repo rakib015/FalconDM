@@ -1797,6 +1797,20 @@ class SettingsDialog(ctk.CTkToplevel):
         body = ctk.CTkScrollableFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=18, pady=12)
 
+        # Appearance & Theme Accents
+        ctk.CTkLabel(body, text="APPEARANCE & THEME ACCENTS", font=ctk.CTkFont(size=10, weight="bold"), text_color="#38bdf8").pack(anchor="w", pady=(5, 6))
+        theme_frame = ctk.CTkFrame(body, fg_color="transparent")
+        theme_frame.pack(fill="x", pady=(2, 10))
+        ctk.CTkLabel(theme_frame, text="Cyberpunk Accent Color Palette:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#cbd5e1").pack(side="left")
+        self.combo_theme = ctk.CTkComboBox(
+            theme_frame,
+            values=["Cyberpunk Cyan", "Emerald Matrix", "Sunset Orange", "Vaporwave Violet", "Crimson Turbo"],
+            width=200,
+            height=30
+        )
+        self.combo_theme.set(config_store.get("ui_theme_accent", "Cyberpunk Cyan"))
+        self.combo_theme.pack(side="right")
+
         # 1. Downloads section
         ctk.CTkLabel(body, text="GENERAL DOWNLOADS", font=ctk.CTkFont(size=10, weight="bold"), text_color="#38bdf8").pack(anchor="w", pady=(5, 6))
 
@@ -1893,6 +1907,16 @@ class SettingsDialog(ctk.CTkToplevel):
         )
         self.combo_concurr.set(str(config_store.get("max_concurrent_tasks", 3)))
         self.combo_concurr.pack(side="left")
+
+        # Auto-Speed Optimizer switch
+        self.var_auto_speed = ctk.BooleanVar(value=config_store.get("auto_speed_optimizer", True))
+        ctk.CTkSwitch(
+            body,
+            text="⚡ Auto-Speed Optimizer (Auto-scale 8-32 connections by server latency & BDP)",
+            variable=self.var_auto_speed,
+            progress_color="#2563eb",
+            font=ctk.CTkFont(size=11, weight="bold")
+        ).pack(anchor="w", pady=(2, 10))
 
         # 2. System & Tray Section
         ctk.CTkLabel(body, text="SYSTEM & BEHAVIOR", font=ctk.CTkFont(size=10, weight="bold"), text_color="#38bdf8").pack(anchor="w", pady=(12, 6))
@@ -2004,6 +2028,8 @@ class SettingsDialog(ctk.CTkToplevel):
             self.entry_dir.insert(0, d)
 
     def _save(self):
+        config_store.set("ui_theme_accent", self.combo_theme.get())
+        config_store.set("auto_speed_optimizer", self.var_auto_speed.get())
         config_store.set("default_download_dir", self.entry_dir.get().strip())
         config_store.set("ask_save_location_everytime", self.var_ask_save.get())
         config_store.set("remember_last_download_dir", self.var_remember_dir.get())
