@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+import threading
 import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
@@ -8,8 +9,14 @@ from typing import Optional
 
 try:
     from ..core.platform_utils import open_file_or_folder, bring_window_to_front
+    from ..core.config_manager import config_store, THEME_PALETTES
+    from ..core.hasher import compute_checksums
+    from ..core.antivirus_scanner import AntivirusScanner
 except (ImportError, ValueError):
     from core.platform_utils import open_file_or_folder, bring_window_to_front
+    from core.config_manager import config_store, THEME_PALETTES
+    from core.hasher import compute_checksums
+    from core.antivirus_scanner import AntivirusScanner
 
 def format_bytes(size_bytes: int) -> str:
     if size_bytes <= 0:
@@ -74,22 +81,42 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
         self._chime_played = False
         self.speed_history = [0.0] * 35
         self.peak_speed_seen = 0.0
+        self._computed_sha256 = ""
+        self._computed_md5 = ""
+        self._hash_thread_started = False
+        self._completion_card_shown = False
 
         self._build_ui()
         self._start_tick()
 
+    def get_theme_palette(self) -> dict:
+        try:
+            theme_name = config_store.get("ui_theme_accent", "Cyberpunk Cyan")
+            return THEME_PALETTES.get(theme_name, THEME_PALETTES["Cyberpunk Cyan"])
+        except Exception:
+            return {
+                "primary": "#0284c7",
+                "primary_hover": "#0369a1",
+                "accent": "#38bdf8",
+                "badge_bg": "#082f49",
+                "badge_text": "#38bdf8",
+                "graph_fill": "#082f49",
+                "graph_line": "#38bdf8"
+            }
+
     def _build_ui(self):
+        palette = self.get_theme_palette()
         # 1. Header Banner (Packed Top)
         header = ctk.CTkFrame(self, fg_color="#0b0f19", height=48, corner_radius=0, border_width=1, border_color="#1e293b")
         header.pack(fill="x", side="top")
         
-        lbl_head = ctk.CTkLabel(
+        self.lbl_head = ctk.CTkLabel(
             header,
             text=f"⚡ FalconDM Turbo Download ({getattr(self.task, 'num_connections', 8)} Connections)",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color="#38bdf8"
+            text_color=palette.get("accent", "#38bdf8")
         )
-        lbl_head.pack(side="left", padx=16, pady=10)
+        self.lbl_head.pack(side="left", padx=16, pady=10)
 
         # 2. Bottom Action Bar (PACKED FIRST AT BOTTOM TO GUARANTEE VISIBILITY)
         btn_bar = ctk.CTkFrame(self, fg_color="#0b0f19", height=54, corner_radius=0, border_width=1, border_color="#1e293b")
@@ -145,6 +172,23 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
             command=self._open_log
         )
         self.btn_view_log.pack(side="left", padx=4, pady=11)
+
+        # Checksum / Security Button
+        self.btn_security = ctk.CTkButton(
+            btn_bar,
+            text="🛡️ Checksum",
+            width=100,
+            height=32,
+            corner_radius=6,
+            fg_color="#064e3b",
+            hover_color="#047857",
+            border_width=1,
+            border_color="#10b981",
+            text_color="#34d399",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._toggle_security_card
+        )
+        self.btn_security.pack(side="left", padx=4, pady=11)
 
         # Preview in VLC / Media Player Button (appears when streamable)
         self.btn_preview = ctk.CTkButton(
@@ -339,6 +383,92 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
         self.table_scroll = ctk.CTkScrollableFrame(self, fg_color="#0d121c", height=120, corner_radius=8, border_width=1, border_color="#1f2737")
         self.table_scroll.pack(fill="both", expand=True, side="top", padx=14, pady=(0, 6))
 
+        # 7. File Integrity & Security Suite Card (Shown when completed or toggled)
+        self.card_security = ctk.CTkFrame(self, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#10b981")
+
+        sec_head = ctk.CTkFrame(self.card_security, fg_color="transparent")
+        sec_head.pack(fill="x", padx=14, pady=(8, 4))
+        ctk.CTkLabel(
+            sec_head,
+            text="🛡️ CRYPTOGRAPHIC INTEGRITY & SECURITY SUITE",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#10b981"
+        ).pack(side="left")
+
+        btn_show_threads = ctk.CTkButton(
+            sec_head,
+            text="📊 View Thread Map",
+            width=120,
+            height=24,
+            corner_radius=4,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            font=ctk.CTkFont(size=10),
+            command=self._toggle_security_card
+        )
+        btn_show_threads.pack(side="right")
+
+        h_frame = ctk.CTkFrame(self.card_security, fg_color="#070b12", corner_radius=8, border_width=1, border_color="#1e293b")
+        h_frame.pack(fill="x", padx=14, pady=(0, 6))
+
+        # SHA-256 Row
+        sha_row = ctk.CTkFrame(h_frame, fg_color="transparent")
+        sha_row.pack(fill="x", padx=10, pady=(6, 3))
+        ctk.CTkLabel(sha_row, text="SHA-256:", font=ctk.CTkFont(size=10, weight="bold"), text_color="#94a3b8", width=65, anchor="w").pack(side="left")
+        self.lbl_sha256 = ctk.CTkLabel(sha_row, text="Calculating cryptographic hash...", font=ctk.CTkFont(family="Consolas", size=9), text_color="#cbd5e1", anchor="w")
+        self.lbl_sha256.pack(side="left", fill="x", expand=True)
+        self.btn_copy_sha = ctk.CTkButton(sha_row, text="📋 Copy", width=60, height=22, font=ctk.CTkFont(size=10), command=self._copy_sha256)
+        self.btn_copy_sha.pack(side="right")
+
+        # MD5 Row
+        md5_row = ctk.CTkFrame(h_frame, fg_color="transparent")
+        md5_row.pack(fill="x", padx=10, pady=(0, 6))
+        ctk.CTkLabel(md5_row, text="MD5:", font=ctk.CTkFont(size=10, weight="bold"), text_color="#94a3b8", width=65, anchor="w").pack(side="left")
+        self.lbl_md5 = ctk.CTkLabel(md5_row, text="Calculating...", font=ctk.CTkFont(family="Consolas", size=9), text_color="#cbd5e1", anchor="w")
+        self.lbl_md5.pack(side="left", fill="x", expand=True)
+        self.btn_copy_md5 = ctk.CTkButton(md5_row, text="📋 Copy", width=60, height=22, font=ctk.CTkFont(size=10), command=self._copy_md5)
+        self.btn_copy_md5.pack(side="right")
+
+        # Verify & AV Row
+        verify_card = ctk.CTkFrame(self.card_security, fg_color="#070b12", corner_radius=8, border_width=1, border_color="#1e293b")
+        verify_card.pack(fill="x", padx=14, pady=(0, 6))
+
+        val_row = ctk.CTkFrame(verify_card, fg_color="transparent")
+        val_row.pack(fill="x", padx=10, pady=(6, 6))
+
+        self.entry_compare_hash = ctk.CTkEntry(
+            val_row,
+            placeholder_text="Paste expected SHA256 or MD5 hash to verify match...",
+            height=28,
+            font=ctk.CTkFont(family="Consolas", size=10),
+            fg_color="#0b0f19",
+            border_color="#1e293b"
+        )
+        self.entry_compare_hash.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_compare_hash.bind("<KeyRelease>", self._check_hash_match)
+
+        self.lbl_hash_match_badge = ctk.CTkLabel(
+            val_row,
+            text="",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color="#94a3b8",
+            width=115
+        )
+        self.lbl_hash_match_badge.pack(side="left", padx=(0, 8))
+
+        self.btn_scan_av = ctk.CTkButton(
+            val_row,
+            text="🛡️ Scan Antivirus",
+            width=120,
+            height=28,
+            corner_radius=6,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=self._run_av_scan
+        )
+        self.btn_scan_av.pack(side="right")
+
         self.thread_rows = []
         self._sync_buttons()
 
@@ -393,14 +523,24 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
 
         elif st == "Completed":
             # Completed state -> Show Open File and Open Folder
+            palette = self.get_theme_palette()
             if hasattr(self, 'btn_pause') and self.btn_pause.winfo_exists():
-                self.btn_pause.configure(text="🚀 Open File", fg_color="#2563eb", hover_color="#1d4ed8")
+                self.btn_pause.configure(text="🚀 Open File", fg_color=palette.get("primary", "#2563eb"), hover_color=palette.get("primary_hover", "#1d4ed8"))
             if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
-                self.btn_speed_resume.configure(text="🚀 Open File", fg_color="#2563eb", hover_color="#1d4ed8")
+                self.btn_speed_resume.configure(text="🚀 Open File", fg_color=palette.get("primary", "#2563eb"), hover_color=palette.get("primary_hover", "#1d4ed8"))
             if hasattr(self, 'btn_cancel') and self.btn_cancel.winfo_exists():
                 self.btn_cancel.configure(text="📂 Open Folder", fg_color="#334155", hover_color="#475569")
             if hasattr(self, 'btn_speed_cancel') and self.btn_speed_cancel.winfo_exists():
                 self.btn_speed_cancel.configure(text="📂 Open Folder", fg_color="#334155", hover_color="#475569")
+
+            # Auto-reveal Integrity & Security Card upon download completion
+            if not getattr(self, "_completion_card_shown", False):
+                self._completion_card_shown = True
+                if hasattr(self, 'table_scroll') and self.table_scroll.winfo_ismapped():
+                    self.table_scroll.pack_forget()
+                if hasattr(self, 'card_security') and not self.card_security.winfo_ismapped():
+                    self.card_security.pack(fill="both", expand=True, side="top", padx=14, pady=(0, 6))
+                self._start_hash_calculation()
 
         else:
             # Paused / Queued / Error / Canceled -> Show Start/Resume
@@ -504,6 +644,92 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
         elif os.path.exists(folder):
             open_file_or_folder(folder)
 
+    def _toggle_security_card(self):
+        if getattr(self, "card_security", None) and self.card_security.winfo_ismapped():
+            self.card_security.pack_forget()
+            if hasattr(self, 'table_scroll'):
+                self.table_scroll.pack(fill="both", expand=True, side="top", padx=14, pady=(0, 6))
+        else:
+            if hasattr(self, 'table_scroll') and self.table_scroll.winfo_ismapped():
+                self.table_scroll.pack_forget()
+            if hasattr(self, 'card_security'):
+                self.card_security.pack(fill="both", expand=True, side="top", padx=14, pady=(0, 6))
+            self._start_hash_calculation()
+
+    def _copy_sha256(self):
+        val = getattr(self, "_computed_sha256", "")
+        if val:
+            self.clipboard_clear()
+            self.clipboard_append(val)
+            self.btn_copy_sha.configure(text="✓ Copied!")
+            self.after(1500, lambda: self.btn_copy_sha.configure(text="📋 Copy"))
+
+    def _copy_md5(self):
+        val = getattr(self, "_computed_md5", "")
+        if val:
+            self.clipboard_clear()
+            self.clipboard_append(val)
+            self.btn_copy_md5.configure(text="✓ Copied!")
+            self.after(1500, lambda: self.btn_copy_md5.configure(text="📋 Copy"))
+
+    def _check_hash_match(self, event=None):
+        expected = self.entry_compare_hash.get().strip().lower()
+        if not expected:
+            self.lbl_hash_match_badge.configure(text="", text_color="#94a3b8")
+            self.entry_compare_hash.configure(border_color="#1e293b")
+            return
+        cur_sha = getattr(self, "_computed_sha256", "").lower()
+        cur_md5 = getattr(self, "_computed_md5", "").lower()
+        if (expected in (cur_sha, cur_md5)) and (cur_sha or cur_md5):
+            self.lbl_hash_match_badge.configure(text="✓ Validated!", text_color="#10b981")
+            self.entry_compare_hash.configure(border_color="#10b981")
+        else:
+            self.lbl_hash_match_badge.configure(text="✕ Mismatch", text_color="#ef4444")
+            self.entry_compare_hash.configure(border_color="#ef4444")
+
+    def _run_av_scan(self):
+        if not os.path.exists(self.task.save_path):
+            return
+        self.btn_scan_av.configure(text="Scanning...", state="disabled")
+        def worker():
+            res = AntivirusScanner.scan_file(self.task.save_path)
+            def update():
+                self.btn_scan_av.configure(state="normal")
+                if res.get("clean"):
+                    self.btn_scan_av.configure(text="✅ Clean File", fg_color="#064e3b", text_color="#34d399")
+                else:
+                    self.btn_scan_av.configure(text="⚠️ Threat Found", fg_color="#7f1d1d", text_color="#fca5a5")
+            self.after(0, update)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_hash_calculation(self):
+        if getattr(self, "_hash_thread_started", False):
+            return
+        if not os.path.exists(self.task.save_path):
+            return
+        self._hash_thread_started = True
+
+        def calc():
+            try:
+                res = compute_checksums(self.task.save_path, ['sha256', 'md5'])
+                sha = res.get('sha256', '')
+                md5 = res.get('md5', '')
+                self._computed_sha256 = sha
+                self._computed_md5 = md5
+
+                def apply():
+                    if hasattr(self, 'lbl_sha256') and self.lbl_sha256.winfo_exists():
+                        self.lbl_sha256.configure(text=sha or "N/A")
+                    if hasattr(self, 'lbl_md5') and self.lbl_md5.winfo_exists():
+                        self.lbl_md5.configure(text=md5 or "N/A")
+                    self._check_hash_match()
+
+                self.after(0, apply)
+            except Exception:
+                pass
+
+        threading.Thread(target=calc, daemon=True).start()
+
     def _draw_speed_graph(self):
         c = getattr(self, "speed_canvas", None)
         if not c or not c.winfo_exists():
@@ -526,6 +752,8 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
             y = (h - 6) - (ratio * (h - 16))
             points.append((x, y))
 
+        palette = self.get_theme_palette()
+
         # Cyber Grid Lines
         for r, color in [(0.33, "#131c2a"), (0.66, "#182436")]:
             gy = (h - 6) - (r * (h - 16))
@@ -537,16 +765,16 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
             for pt in points:
                 poly.extend(pt)
             poly.extend([w - 6, h - 4])
-            c.create_polygon(poly, fill="#0c1e38", outline="")
+            c.create_polygon(poly, fill=palette.get("graph_fill", "#0c1e38"), outline="")
 
             # Glowing neon curve
             flat_pts = [coord for pt in points for coord in pt]
-            c.create_line(flat_pts, fill="#1d4ed8", width=3, smooth=True)
-            c.create_line(flat_pts, fill="#38bdf8", width=1.5, smooth=True)
+            c.create_line(flat_pts, fill=palette.get("primary", "#1d4ed8"), width=3, smooth=True)
+            c.create_line(flat_pts, fill=palette.get("graph_line", "#38bdf8"), width=1.5, smooth=True)
 
             # Glowing lead pulse point
             last_x, last_y = points[-1]
-            c.create_oval(last_x - 3.5, last_y - 3.5, last_x + 3.5, last_y + 3.5, fill="#38bdf8", outline="#ffffff", width=1)
+            c.create_oval(last_x - 3.5, last_y - 3.5, last_x + 3.5, last_y + 3.5, fill=palette.get("accent", "#38bdf8"), outline="#ffffff", width=1)
 
     def _draw_segment_matrix(self):
         c = getattr(self, "segment_canvas", None)
@@ -564,10 +792,12 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
         # Background base track
         c.create_rectangle(1, 1, w - 1, h - 1, fill="#070b12", outline="#1e293b", width=1)
 
+        palette = self.get_theme_palette()
+
         if not segments or total_size <= 0:
             prog = getattr(self.task, "progress_pct", 0.0) / 100.0
             fill_w = max(2, int((w - 4) * prog))
-            c.create_rectangle(2, 2, 2 + fill_w, h - 2, fill="#0284c7", outline="")
+            c.create_rectangle(2, 2, 2 + fill_w, h - 2, fill=palette.get("primary", "#0284c7"), outline="")
             return
 
         pad_x = 2
@@ -586,13 +816,13 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
             # Downloaded portion
             if xc > x0:
                 is_done = seg.status == "completed" or seg.current > seg.end
-                fill_color = "#10b981" if is_done else "#0284c7"
+                fill_color = "#10b981" if is_done else palette.get("primary", "#0284c7")
                 c.create_rectangle(x0, pad_y, min(x1, xc), pad_y + draw_h, fill=fill_color, outline="")
 
             # Active download head glow sliver
             if seg.status == "downloading" and xc < x1:
                 head_x = min(x1 - 1, xc)
-                c.create_line(head_x, pad_y, head_x, pad_y + draw_h, fill="#38bdf8", width=2)
+                c.create_line(head_x, pad_y, head_x, pad_y + draw_h, fill=palette.get("accent", "#38bdf8"), width=2)
                 c.create_line(head_x - 1, pad_y, head_x - 1, pad_y + draw_h, fill="#ffffff", width=1)
 
             # Segment boundary divider
@@ -608,6 +838,16 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
                 self.after(1000, update_loop)
                 return
 
+            palette = self.get_theme_palette()
+            latency = getattr(self.task, "latency_ms", 0.0)
+            conn_count = getattr(self.task, 'num_connections', 8)
+            head_str = f"⚡ FalconDM Turbo Download ({conn_count} Connections"
+            if latency > 0:
+                head_str += f" • {latency:.0f}ms Ping"
+            head_str += ")"
+            if hasattr(self, 'lbl_head') and self.lbl_head.winfo_exists():
+                self.lbl_head.configure(text=head_str, text_color=palette.get("accent", "#38bdf8"))
+
             self.lbl_fname.configure(text=self.task.filename)
 
             if getattr(self.task, "status", "") == "Auto-reconnecting":
@@ -615,10 +855,13 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
                 self.lbl_status.configure(text=msg, text_color="#f59e0b")
             elif getattr(self.task, "status", "") == "Error":
                 self.lbl_status.configure(text=f"Error: {self.task.error_message}", text_color="#ef4444")
+            elif getattr(self.task, "status", "") == "Completed":
+                self.lbl_status.configure(text="Completed", text_color="#10b981")
             else:
-                self.lbl_status.configure(text=self.task.status, text_color="#38bdf8")
+                self.lbl_status.configure(text=self.task.status, text_color=palette.get("accent", "#38bdf8"))
             
             prog = getattr(self.task, "progress_pct", 0.0) / 100.0
+            self.prog_bar.configure(progress_color=palette.get("primary", "#0284c7"))
             self.prog_bar.set(prog)
 
             size_str = format_bytes(self.task.file_size) if self.task.file_size > 0 else "Unknown"
@@ -674,7 +917,7 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
                 if seg.status == "completed":
                     bar.configure(progress_color="#10b981")
                 elif seg.status == "downloading":
-                    bar.configure(progress_color="#38bdf8")
+                    bar.configure(progress_color=palette.get("accent", "#38bdf8"))
                 else:
                     bar.configure(progress_color="#64748b")
 

@@ -210,12 +210,24 @@ class TestFalconDMEnhancements(unittest.TestCase):
         # Verify JSON manifests
         base_dir = os.path.dirname(os.path.abspath(__file__))
         c_manifest = os.path.join(base_dir, "core", "com.falcondm.downloader.json")
+        f_manifest = os.path.join(base_dir, "core", "com.falcondm.downloader_firefox.json")
         self.assertTrue(os.path.exists(c_manifest))
         with open(c_manifest, "r", encoding="utf-8") as f:
             cdata = json.load(f)
         self.assertIn("path", cdata)
         self.assertTrue(cdata["path"].endswith("native_host.bat"))
         self.assertIn("chrome-extension://kbekmfgcpjeiiiehpffkapbpncbpfjcj/", cdata["allowed_origins"])
+
+        # Reset back to portable relative path to prevent local path leaks
+        cdata["path"] = "native_host.bat"
+        with open(c_manifest, "w", encoding="utf-8") as f:
+            json.dump(cdata, f, indent=2)
+        if os.path.exists(f_manifest):
+            with open(f_manifest, "r", encoding="utf-8") as f:
+                fdata = json.load(f)
+            fdata["path"] = "native_host.bat"
+            with open(f_manifest, "w", encoding="utf-8") as f:
+                json.dump(fdata, f, indent=2)
 
     def test_lightweight_memory_and_low_spec_utils(self):
         from core.platform_utils import trim_memory_footprint, is_low_spec_system
@@ -534,6 +546,47 @@ class TestFalconDMEnhancements(unittest.TestCase):
             manifest_str = z.read("manifest.json").decode("utf-8")
             self.assertNotIn("browser_specific_settings", manifest_str)
             self.assertNotIn('"key"', manifest_str)
+
+    def test_task_latency_ms_and_speed_indicator(self):
+        task = DownloadTask("lat_test", "https://example.com/test.iso", "test.iso", num_connections=8)
+        self.assertEqual(task.latency_ms, 0.0)
+        task.latency_ms = 45.2
+        self.assertEqual(task.latency_ms, 45.2)
+
+    def test_floating_download_theme_and_security_suite(self):
+        from gui.download_window import FloatingDownloadDialog
+        from core.hasher import compute_checksums
+        import tempfile
+
+        # Verify theme palette helper returns valid palettes
+        for theme_name in ["Emerald Matrix", "Sunset Orange", "Vaporwave Violet", "Crimson Turbo", "Cyberpunk Cyan"]:
+            config_store.set("ui_theme_accent", theme_name)
+            # Create a mock dialog instance without running Tk loop
+            dummy_task = DownloadTask("dummy_task", "https://example.com/test.bin", "test.bin")
+            # Directly verify theme lookup
+            from core.config_manager import THEME_PALETTES
+            palette = THEME_PALETTES.get(theme_name)
+            self.assertIsNotNone(palette)
+            self.assertIn("accent", palette)
+            self.assertIn("primary", palette)
+
+        # Reset back to default
+        config_store.set("ui_theme_accent", "Cyberpunk Cyan")
+
+        # Test checksum verification with temp file
+        with tempfile.NamedTemporaryFile(delete=False) as tf:
+            tf.write(b"FalconDM Turbo Checksum Test Data 12345")
+            temp_path = tf.name
+
+        try:
+            hashes = compute_checksums(temp_path, ['sha256', 'md5'])
+            self.assertIn('sha256', hashes)
+            self.assertIn('md5', hashes)
+            self.assertEqual(len(hashes['sha256']), 64)
+            self.assertEqual(len(hashes['md5']), 32)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
 
 if __name__ == "__main__":

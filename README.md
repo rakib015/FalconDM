@@ -167,6 +167,13 @@
 ### 32. 📦 1-Click Browser Extension Store Packages (`build_extension_packages.py`)
 - Automated store packager generating clean, compliant `.zip` archives for **Chrome Web Store**, **Microsoft Edge Add-ons**, and **Mozilla Firefox AMO** with full submission guides.
 
+### 33. 🛡️ Floating Download Window Security & Integrity Suite (`gui/download_window.py`)
+- **Real-Time Cryptographic Hasher**: Automatically calculates SHA-256 and MD5 hashes in the background upon completion.
+- **Interactive Hash Match Validator**: Paste any vendor checksum to get instant visual verification (`✓ Validated!` in emerald green or alert red mismatch).
+- **1-Click Antivirus Scanner**: Integrated Windows Defender scan with instant clean/threat status badge.
+- **Theme Palette Synchronization**: The floating download window, speed curves, segment glowing heads, and progress bars dynamically reflect your selected Cyberpunk accent theme.
+- **Auto-Speed Latency HUD**: Header banner displays real-time server TTFB latency and parallel connection metrics (e.g. `⚡ FalconDM Turbo (32 Connections • 38ms Ping)`).
+
 ---
 
 ## 💻 Quick Start
@@ -201,7 +208,7 @@ FalconDM includes a native browser extension for Chrome, Edge, Brave, Opera, and
 python main.py
 ```
 
-### Run Automated Tests (33/33 Tests Passed)
+### Run Automated Tests (35/35 Tests Passed)
 ```powershell
 # Run the complete test suite:
 python test_features.py

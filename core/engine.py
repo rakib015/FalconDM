@@ -161,6 +161,7 @@ class DownloadTask:
         self.error_message = ""
         self.etag = ""
         self.queue_name = "Default"
+        self.latency_ms: float = 0.0
         
         self.segments: List[Segment] = []
         self._threads: List[threading.Thread] = []
@@ -303,6 +304,7 @@ class DownloadTask:
                     resp.close()
 
                 latency_ms = max(1.0, (time.perf_counter() - t_start) * 1000.0)
+                self.latency_ms = latency_ms
 
                 if resp.status_code >= 400:
                     last_error = f"HTTP {resp.status_code} - {getattr(resp, 'reason', 'Error')}"
