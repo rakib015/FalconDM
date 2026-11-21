@@ -26,7 +26,8 @@
         const title = filename || getPageTitle();
         let finalName = title;
         if (format_id && title && !title.includes('.')) {
-            const ext = format_id === 'image_direct' ? '.jpg' : (format_id && format_id.includes('audio') ? '.mp3' : '.mp4');
+            const isAudioOnly = format_id && format_id.includes('audio') && !format_id.includes('video');
+            const ext = format_id === 'image_direct' ? '.jpg' : (isAudioOnly ? '.mp3' : '.mp4');
             finalName = `${title}${ext}`;
         }
         GM_xmlhttpRequest({

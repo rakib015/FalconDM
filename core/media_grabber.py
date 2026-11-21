@@ -298,8 +298,8 @@ class MediaGrabber:
 
         format_lower = (format_id or "").lower()
         is_audio = (
-            format_id in ('bestaudio', 'bestaudio/best', 'bestaudio_mp3_320', 'bestaudio_m4a', 'bestaudio_flac')
-            or 'audio' in format_lower
+            format_id in ('bestaudio', 'bestaudio/best', 'bestaudio_mp3_320', 'bestaudio_m4a', 'bestaudio_flac', 'audio_only')
+            or ('audio' in format_lower and 'video' not in format_lower)
         )
         if is_audio:
             chosen_format = 'bestaudio/best'

@@ -2011,7 +2011,8 @@ class FalconDMApp(ctk.CTk):
                 elif is_media:
                     if format_id and format_id != "prompt":
                         # Direct instant media download with user-selected quality format!
-                        save_dir = os.path.join(config_store.get("default_download_dir"), "Video" if "audio" not in format_id else "Audio")
+                        is_audio_only = "audio" in (format_id or "").lower() and "video" not in (format_id or "").lower()
+                        save_dir = os.path.join(config_store.get("default_download_dir"), "Audio" if is_audio_only else "Video")
                         os.makedirs(save_dir, exist_ok=True)
                         self._download_video_stream(url, format_id, save_dir, headers=headers, title_hint=filename)
                     else:
@@ -2186,11 +2187,12 @@ class FalconDMApp(ctk.CTk):
         outtmpl = os.path.join(save_dir, "%(title).80s.%(ext)s")
         
         display_name = title_hint or "Fetching video stream..."
+        is_audio_only = "audio" in (format_id or "").lower() and "video" not in (format_id or "").lower()
         task = DownloadTask(
             task_id=task_id,
             url=url,
             save_path=os.path.join(save_dir, title_hint or "video_download"),
-            category="Video" if not format_id.startswith("bestaudio") else "Audio",
+            category="Audio" if is_audio_only else "Video",
             headers=headers or {}
         )
         task.filename = display_name
