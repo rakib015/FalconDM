@@ -5,6 +5,14 @@ if exist "%DIR%..\FalconDM.exe" (
     "%DIR%..\FalconDM.exe" --native-host
     exit /b %errorlevel%
 )
+if exist "%DIR%..\..\FalconDM.exe" (
+    "%DIR%..\..\FalconDM.exe" --native-host
+    exit /b %errorlevel%
+)
+if exist "%DIR%FalconDM.exe" (
+    "%DIR%FalconDM.exe" --native-host
+    exit /b %errorlevel%
+)
 if exist "%DIR%..\.venv\Scripts\python.exe" (
     "%DIR%..\.venv\Scripts\python.exe" "%DIR%native_host.py"
     exit /b %errorlevel%

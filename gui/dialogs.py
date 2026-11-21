@@ -540,9 +540,13 @@ class BrowserIntegrationDialog(ctk.CTkToplevel):
 
     def _build_ui(self):
         import webbrowser
+        from core.platform_utils import get_browser_extension_dir
 
-        ext_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "browser_extension"))
-        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "falcon_browser_extension.user.js"))
+        ext_dir = get_browser_extension_dir()
+        base_root = os.path.dirname(ext_dir)
+        script_path = os.path.abspath(os.path.join(base_root, "assets", "falcon_browser_extension.user.js"))
+        if not os.path.isfile(script_path):
+            script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "falcon_browser_extension.user.js"))
         bookmarklet_code = (
             "javascript:(function(){const u=window.location.href;const s=window.getSelection().toString();"
             "const t=prompt('⚡ Send download to FalconDM:',s||u);if(t){fetch('http://127.0.0.1:9666/download',"

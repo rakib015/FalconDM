@@ -296,13 +296,20 @@ class MediaGrabber:
         import shutil
         ffmpeg_bin = shutil.which('ffmpeg')
 
-        is_audio = format_id in ('bestaudio', 'bestaudio_mp3_320', 'bestaudio_m4a', 'bestaudio_flac')
+        format_lower = (format_id or "").lower()
+        is_audio = (
+            format_id in ('bestaudio', 'bestaudio/best', 'bestaudio_mp3_320', 'bestaudio_m4a', 'bestaudio_flac')
+            or 'audio' in format_lower
+        )
         if is_audio:
             chosen_format = 'bestaudio/best'
         elif format_id in ('bestvideo+bestaudio/best', 'best', ''):
             chosen_format = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best'
+        elif '+' in format_id or '/' in format_id:
+            # Complex format string already specified (e.g. bestvideo[height<=1080]+bestaudio...)
+            chosen_format = f"{format_id}/bestvideo+bestaudio/best"
         else:
-            chosen_format = f"{format_id}+bestaudio/best"
+            chosen_format = f"{format_id}+bestaudio/bestvideo+bestaudio/best"
 
         ydl_opts = {
             'format': chosen_format,
@@ -313,6 +320,8 @@ class MediaGrabber:
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
+            'skip_unavailable_fragments': True,
+            'compat_opts': ['no-live-chat'],
         }
 
         if ffmpeg_bin:
@@ -340,11 +349,11 @@ class MediaGrabber:
                 'preferredquality': qual,
             }]
 
-        # Subtitle extraction support
+        # Subtitle extraction support (English/main subtitles, never request 'all' to avoid HTTP 429)
         if download_subtitles:
             ydl_opts['writesubtitles'] = True
             ydl_opts['writeautomaticsub'] = True
-            ydl_opts['subtitleslangs'] = ['en', 'all']
+            ydl_opts['subtitleslangs'] = ['en', 'en-US', 'en-orig']
             ydl_opts['subtitlesformat'] = 'srt/best'
             if 'postprocessors' not in ydl_opts:
                 ydl_opts['postprocessors'] = []
@@ -358,7 +367,22 @@ class MediaGrabber:
                 ydl.download([url])
             return True
         except Exception as e:
-            # If download failed with headers, retry once cleanly without headers
+            # Retry 1: If subtitle extraction caused failure (e.g. rate limit), strip subtitles and retry
+            if ydl_opts.get('writesubtitles'):
+                ydl_opts.pop('writesubtitles', None)
+                ydl_opts.pop('writeautomaticsub', None)
+                ydl_opts.pop('subtitleslangs', None)
+                ydl_opts.pop('subtitlesformat', None)
+                if 'postprocessors' in ydl_opts:
+                    ydl_opts['postprocessors'] = [p for p in ydl_opts['postprocessors'] if p.get('key') != 'FFmpegSubtitlesConvertor']
+                try:
+                    with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
+                        ydl.download([url])
+                    return True
+                except Exception as sub_err:
+                    e = sub_err
+
+            # Retry 2: If download failed with headers, retry once cleanly without headers
             if 'http_headers' in ydl_opts:
                 ydl_opts.pop('http_headers', None)
                 try:
@@ -368,15 +392,26 @@ class MediaGrabber:
                 except Exception as retry_err:
                     e = retry_err
             
-            # If failed because format combination could not be merged/found, retry with single stream 'best'
-            if ydl_opts.get('format') != 'best':
-                ydl_opts['format'] = 'best'
+            # Retry 3: Fall back to default best video/audio combination
+            fallback_fmt = 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best'
+            if ydl_opts.get('format') != fallback_fmt:
+                ydl_opts['format'] = fallback_fmt
                 try:
                     with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
                         ydl.download([url])
                     return True
                 except Exception as format_err:
                     e = format_err
+
+            # Retry 4: Ultimate fallback to single stream 'best'
+            if ydl_opts.get('format') != 'best':
+                ydl_opts['format'] = 'best'
+                try:
+                    with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
+                        ydl.download([url])
+                    return True
+                except Exception as ultimate_err:
+                    e = ultimate_err
 
             try:
                 err_msg = str(e).encode('ascii', errors='replace').decode('ascii')

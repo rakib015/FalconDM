@@ -1,6 +1,6 @@
 """
 FalconDM Core Engine Package
-Version: 2.8.0
+Version: 2.8.1
 """
-__version__ = "2.8.0"
+__version__ = "2.8.1"
 __app_name__ = "FalconDM"

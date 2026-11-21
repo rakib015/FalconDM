@@ -15,6 +15,13 @@ def handle_cli(args: list) -> bool:
     if len(args) <= 1:
         return False
 
+    # 0. Intercept Native Messaging Host invocation from Chrome, Edge, Firefox, Brave, Opera
+    for a in args[1:]:
+        if a == "--native-host" or a.startswith("chrome-extension://") or a.startswith("moz-extension://"):
+            from core.native_host import main as run_native_host
+            run_native_host()
+            return True
+
     parser = argparse.ArgumentParser(
         prog="falcondm",
         description="⚡ FalconDM — Turbo Multi-Threaded Download Manager (CLI Mode)"

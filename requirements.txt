@@ -1,0 +1,8 @@
+# FalconDM - Turbo Download Accelerator Dependencies
+customtkinter>=5.2.0
+pillow>=10.0.0
+pystray>=0.19.5
+requests>=2.31.0
+urllib3>=2.0.0
+beautifulsoup4>=4.12.0
+yt-dlp>=2024.8.0

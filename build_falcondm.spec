@@ -12,7 +12,11 @@ added_datas = [
     ('assets', 'assets'),
     ('core/com.falcondm.downloader.json', 'core'),
     ('core/com.falcondm.downloader_firefox.json', 'core'),
+    ('core/native_host.bat', 'core'),
+    ('core/native_host.py', 'core'),
     ('register_native_host.bat', '.'),
+    ('install_extension.bat', '.'),
+    ('install_extension.ps1', '.'),
 ] + ctk_datas
 
 hidden_imports = [
@@ -64,6 +68,7 @@ hidden_imports = [
     'core.duplicate_detector',
     'core.import_export',
     'core.webhook_notifier',
+    'core.native_host',
     'gui',
     'gui.app',
     'gui.dialogs',

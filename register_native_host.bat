@@ -10,15 +10,32 @@ echo.
 set "BASE_DIR=%~dp0"
 if "%BASE_DIR:~-1%"=="\" set "BASE_DIR=%BASE_DIR:~0,-1%"
 
-set "NATIVE_HOST_BAT=%BASE_DIR%\core\native_host.bat"
-set "CHROME_MANIFEST=%BASE_DIR%\core\com.falcondm.downloader.json"
-set "FIREFOX_MANIFEST=%BASE_DIR%\core\com.falcondm.downloader_firefox.json"
-
-:: Use python if available to dynamically inject the absolute path
-where python >nul 2>&1
-if %errorlevel% equ 0 (
-    python -c "from core.platform_utils import register_browser_integration; register_browser_integration()" >nul 2>&1
+:: Resolve host binary (prefer FalconDM.exe if present, else native_host.bat)
+set "HOST_BIN="
+if exist "%BASE_DIR%\FalconDM.exe" (
+    set "HOST_BIN=%BASE_DIR%\FalconDM.exe"
+) else if exist "%BASE_DIR%\dist\FalconDM\FalconDM.exe" (
+    set "HOST_BIN=%BASE_DIR%\dist\FalconDM\FalconDM.exe"
+) else if exist "%BASE_DIR%\core\native_host.bat" (
+    set "HOST_BIN=%BASE_DIR%\core\native_host.bat"
+) else (
+    set "HOST_BIN=%BASE_DIR%\native_host.bat"
 )
+
+:: Prepare AppData target directory
+set "TARGET_DIR=%APPDATA%\FalconDM\native_messaging"
+if not exist "%TARGET_DIR%" mkdir "%TARGET_DIR%" >nul 2>&1
+
+set "CHROME_MANIFEST=%TARGET_DIR%\com.falcondm.downloader.json"
+set "FIREFOX_MANIFEST=%TARGET_DIR%\com.falcondm.downloader_firefox.json"
+
+:: Write absolute-path manifests using PowerShell (100%% native on every Windows PC)
+powershell -NoProfile -Command ^
+  "$bin = '%HOST_BIN%'.Replace('\', '\\');" ^
+  "$c = @{ name = 'com.falcondm.downloader'; description = 'FalconDM Native Messaging Host'; path = $bin; type = 'stdio'; allowed_origins = @('chrome-extension://kbekmfgcpjeiiiehpffkapbpncbpfjcj/') };" ^
+  "$c | ConvertTo-Json -Depth 4 | Set-Content -Path '%CHROME_MANIFEST%' -Encoding UTF8;" ^
+  "$f = @{ name = 'com.falcondm.downloader'; description = 'FalconDM Native Messaging Host for Firefox'; path = $bin; type = 'stdio'; allowed_extensions = @('falcondm-turbo@falcondm.local') };" ^
+  "$f | ConvertTo-Json -Depth 4 | Set-Content -Path '%FIREFOX_MANIFEST%' -Encoding UTF8;"
 
 echo [1/5] Registering Google Chrome Native Host...
 reg add "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.falcondm.downloader" /ve /t REG_SZ /d "%CHROME_MANIFEST%" /f >nul 2>&1
@@ -32,6 +49,7 @@ reg add "HKCU\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.falc
 echo [4/5] Registering Opera / Opera GX Native Host...
 reg add "HKCU\Software\Opera Software\Opera Stable\NativeMessagingHosts\com.falcondm.downloader" /ve /t REG_SZ /d "%CHROME_MANIFEST%" /f >nul 2>&1
 reg add "HKCU\Software\Opera Software\Opera GX Stable\NativeMessagingHosts\com.falcondm.downloader" /ve /t REG_SZ /d "%CHROME_MANIFEST%" /f >nul 2>&1
+reg add "HKCU\Software\Vivaldi\NativeMessagingHosts\com.falcondm.downloader" /ve /t REG_SZ /d "%CHROME_MANIFEST%" /f >nul 2>&1
 
 echo [5/5] Registering Mozilla Firefox Native Host...
 reg add "HKCU\Software\Mozilla\NativeMessagingHosts\com.falcondm.downloader" /ve /t REG_SZ /d "%FIREFOX_MANIFEST%" /f >nul 2>&1

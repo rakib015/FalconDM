@@ -139,6 +139,24 @@ def trigger_system_shutdown(sleep: bool = False) -> None:
         except Exception:
             pass
 
+def get_browser_extension_dir() -> str:
+    """Returns the resolved absolute path to the browser_extension directory."""
+    candidates = []
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        candidates.append(os.path.join(exe_dir, "browser_extension"))
+        candidates.append(os.path.join(exe_dir, "_internal", "browser_extension"))
+    
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.abspath(os.path.join(file_dir, "..", "browser_extension")))
+    candidates.append(os.path.abspath(os.path.join(file_dir, "..", "..", "browser_extension")))
+    candidates.append(os.path.abspath(os.path.join(file_dir, "browser_extension")))
+
+    for c in candidates:
+        if os.path.isdir(c) and os.path.isfile(os.path.join(c, "manifest.json")):
+            return os.path.abspath(c)
+    return os.path.abspath(candidates[0])
+
 def register_browser_integration() -> bool:
     """Registers native messaging hosts in OS registry for Chrome, Edge, Brave, Opera, and Firefox."""
     if sys.platform != "win32":
@@ -146,27 +164,53 @@ def register_browser_integration() -> bool:
     try:
         import winreg
         import json
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        native_host_bat = os.path.join(base_dir, "core", "native_host.bat")
-        chrome_manifest = os.path.join(base_dir, "core", "com.falcondm.downloader.json")
-        firefox_manifest = os.path.join(base_dir, "core", "com.falcondm.downloader_firefox.json")
+
+        ext_dir = get_browser_extension_dir()
+        base_dir = os.path.dirname(ext_dir)
+
+        exe_path = sys.executable
+        is_frozen = getattr(sys, 'frozen', False) or exe_path.lower().endswith("falcondm.exe")
         
-        # Ensure manifests point to the absolute path of native_host.bat
-        try:
-            if os.path.exists(chrome_manifest):
-                with open(chrome_manifest, "r", encoding="utf-8-sig") as f:
-                    cdata = json.load(f)
-                cdata["path"] = native_host_bat
-                with open(chrome_manifest, "w", encoding="utf-8") as f:
-                    json.dump(cdata, f, indent=2)
-            if os.path.exists(firefox_manifest):
-                with open(firefox_manifest, "r", encoding="utf-8-sig") as f:
-                    fdata = json.load(f)
-                fdata["path"] = native_host_bat
-                with open(firefox_manifest, "w", encoding="utf-8") as f:
-                    json.dump(fdata, f, indent=2)
-        except Exception as err:
-            safe_print(f"[PlatformUtils] Warning updating manifest paths: {err}")
+        target_host_bin = ""
+        if is_frozen and os.path.isfile(exe_path):
+            target_host_bin = exe_path
+        else:
+            bat_candidate = os.path.join(base_dir, "core", "native_host.bat")
+            if os.path.isfile(bat_candidate):
+                target_host_bin = bat_candidate
+            else:
+                target_host_bin = os.path.abspath(os.path.join(os.path.dirname(__file__), "native_host.bat"))
+
+        # Use AppData to ensure writes succeed under lowest user privileges
+        manifest_dir = os.path.join(os.getenv("APPDATA") or base_dir, "FalconDM", "native_messaging")
+        os.makedirs(manifest_dir, exist_ok=True)
+
+        chrome_manifest = os.path.join(manifest_dir, "com.falcondm.downloader.json")
+        firefox_manifest = os.path.join(manifest_dir, "com.falcondm.downloader_firefox.json")
+
+        cdata = {
+            "name": "com.falcondm.downloader",
+            "description": "FalconDM Native Messaging Host for Auto-Launching",
+            "path": target_host_bin,
+            "type": "stdio",
+            "allowed_origins": [
+                "chrome-extension://kbekmfgcpjeiiiehpffkapbpncbpfjcj/"
+            ]
+        }
+        with open(chrome_manifest, "w", encoding="utf-8") as f:
+            json.dump(cdata, f, indent=2)
+
+        fdata = {
+            "name": "com.falcondm.downloader",
+            "description": "FalconDM Native Messaging Host for Firefox Auto-Launching",
+            "path": target_host_bin,
+            "type": "stdio",
+            "allowed_extensions": [
+                "falcondm-turbo@falcondm.local"
+            ]
+        }
+        with open(firefox_manifest, "w", encoding="utf-8") as f:
+            json.dump(fdata, f, indent=2)
 
         # List of registry keys for all Chromium & Mozilla browsers
         reg_keys = [
@@ -188,9 +232,9 @@ def register_browser_integration() -> bool:
 
         # Copy extension path to Windows clipboard for convenience
         try:
-            ext_path = os.path.join(base_dir, "browser_extension")
-            subprocess.run(["powershell", "-NoProfile", "-Command", f"Set-Clipboard -Value '{ext_path}'"],
-                           capture_output=True, timeout=3, check=False)
+            if os.path.isdir(ext_dir):
+                subprocess.run(["powershell", "-NoProfile", "-Command", f"Set-Clipboard -Value '{ext_dir}'"],
+                               capture_output=True, timeout=3, check=False)
         except Exception:
             pass
 

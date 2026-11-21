@@ -387,7 +387,7 @@ class TestFalconDMEnhancements(unittest.TestCase):
 
     def test_version_v2(self):
         import core
-        self.assertEqual(core.__version__, "2.8.0")
+        self.assertEqual(core.__version__, "2.8.1")
 
     def test_batch_manager_multidimensional_and_alpha(self):
         from core.batch_manager import BatchManager
@@ -459,10 +459,10 @@ class TestFalconDMEnhancements(unittest.TestCase):
         # Test actual hash verification against temporary file
         test_path = os.path.join(_ROOT, "temp_hash_test.bin")
         with open(test_path, "wb") as f:
-            f.write(b"Hello FalconDM v2.8.0")
+            f.write(b"Hello FalconDM v2.8.1")
         
         import hashlib
-        real_hash = hashlib.sha256(b"Hello FalconDM v2.8.0").hexdigest()
+        real_hash = hashlib.sha256(b"Hello FalconDM v2.8.1").hexdigest()
         task.checksum_expected = real_hash
         verified = task.verify_integrity()
         self.assertTrue(verified)
@@ -530,8 +530,8 @@ class TestFalconDMEnhancements(unittest.TestCase):
         from build_extension_packages import build_extension_packages
         build_extension_packages()
         out_dir = os.path.join(_ROOT, "dist_extension")
-        chrome_zip = os.path.join(out_dir, "FalconDM-Chrome-WebStore-v2.8.0.zip")
-        firefox_zip = os.path.join(out_dir, "FalconDM-Firefox-AMO-v2.8.0.zip")
+        chrome_zip = os.path.join(out_dir, "FalconDM-Chrome-WebStore-v2.8.1.zip")
+        firefox_zip = os.path.join(out_dir, "FalconDM-Firefox-AMO-v2.8.1.zip")
         guide_file = os.path.join(out_dir, "SUBMISSION_GUIDE.md")
 
         self.assertTrue(os.path.isfile(chrome_zip))

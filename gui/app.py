@@ -662,7 +662,7 @@ class FalconDMApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("FalconDM v2.8.0 - High Speed Turbo Download Accelerator (Free IDM)")
+        self.title("FalconDM v2.8.1 - High Speed Turbo Download Accelerator (Free IDM)")
         self.geometry("1220x780")
         self.minsize(1040, 660)
 
@@ -798,6 +798,24 @@ class FalconDMApp(ctk.CTk):
         else:
             self.bring_to_front()
 
+        # Automatic Browser Integration: register native messaging hosts on startup
+        try:
+            from core.platform_utils import register_browser_integration
+            threading.Thread(target=register_browser_integration, daemon=True).start()
+        except Exception:
+            pass
+
+        # First run check: automatically prompt user with 1-click browser extension setup
+        if not config_store.get("extension_setup_prompted", False):
+            def _prompt_extension_setup():
+                config_store.set("extension_setup_prompted", True)
+                if not start_minimized:
+                    try:
+                        BrowserIntegrationDialog(self)
+                    except Exception:
+                        pass
+            self.after(1200, _prompt_extension_setup)
+
     def dispatch_to_main(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         """Safely dispatches a callback to execute on the Tkinter mainloop thread."""
         self._ui_queue.put((fn, args, kwargs))
@@ -881,7 +899,7 @@ class FalconDMApp(ctk.CTk):
 
         brand_text_box = ctk.CTkFrame(brand_frame, fg_color="transparent")
         brand_text_box.pack(side="left", padx=(0, 12))
-        lbl_logo = ctk.CTkLabel(brand_text_box, text="FalconDM v2.8.0", font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"), text_color="#f8fafc")
+        lbl_logo = ctk.CTkLabel(brand_text_box, text="FalconDM v2.8.1", font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"), text_color="#f8fafc")
         lbl_logo.pack(anchor="w")
         lbl_tagline = ctk.CTkLabel(brand_text_box, text="TURBO ENGINE • 32X ACCELERATOR", font=ctk.CTkFont(family="Segoe UI", size=8, weight="bold"), text_color="#818cf8")
         lbl_tagline.pack(anchor="w", pady=(0, 0))
@@ -1184,7 +1202,7 @@ class FalconDMApp(ctk.CTk):
         menu.add_command(label="📦 Build Extension Store Packages (.zip)...", command=self._on_build_extension_packages)
         menu.add_separator()
         menu.add_command(label="📜 View Download Diagnostics & Error Logs", command=self._open_log_viewer)
-        menu.add_command(label="ℹ️ About FalconDM v2.8.0", command=self._show_about_dialog)
+        menu.add_command(label="ℹ️ About FalconDM v2.8.1", command=self._show_about_dialog)
 
         try:
             x = self.btn_tools.winfo_rootx()
@@ -1195,8 +1213,8 @@ class FalconDMApp(ctk.CTk):
 
     def _show_about_dialog(self):
         messagebox.showinfo(
-            "About FalconDM v2.8.0",
-            "FalconDM v2.8.0 (Release 2.8.0)\n\n"
+            "About FalconDM v2.8.1",
+            "FalconDM v2.8.1 (Release 2.8.1)\n\n"
             "High-Speed Turbo Segmented Download Accelerator\n\n"
             "• Up to 32 Parallel Segmented Connection Streams\n"
             "• Universal aria2 & Motrix JSON-RPC Bridge (:6800 / :9666)\n"
@@ -1208,7 +1226,7 @@ class FalconDMApp(ctk.CTk):
             "• Anti-Corruption Non-Range Fallback & In-Flight Demotion\n"
             "• Multi-Thread Video & Audio Stream Grabber\n"
             "• Automated Queue Scheduler & Dynamic Bandwidth Limiter\n\n"
-            "Status: v2.8.0 Active & Ready"
+            "Status: v2.8.1 Active & Ready"
         )
 
     def _build_sidebar(self):
@@ -2195,15 +2213,20 @@ class FalconDMApp(ctk.CTk):
                     task.eta_seconds = data.get('eta', 0)
                     raw_fn = data.get('filename', '')
                     if raw_fn:
-                        captured_filename = str(raw_fn)
-                        task.filename = os.path.basename(raw_fn)
-                        task.save_path = raw_fn
+                        ext_lower = os.path.splitext(raw_fn)[1].lower()
+                        # Avoid intermediate subtitle or temp file extensions overwriting media title
+                        if ext_lower not in ('.srt', '.vtt', '.sub', '.lrc', '.part', '.ytdl'):
+                            captured_filename = str(raw_fn)
+                            task.filename = os.path.basename(raw_fn)
+                            task.save_path = raw_fn
                 elif st == 'finished':
                     raw_fn = data.get('filename', '')
                     if raw_fn:
-                        captured_filename = str(raw_fn)
-                        task.filename = os.path.basename(raw_fn)
-                        task.save_path = raw_fn
+                        ext_lower = os.path.splitext(raw_fn)[1].lower()
+                        if ext_lower not in ('.srt', '.vtt', '.sub', '.lrc', '.part', '.ytdl'):
+                            captured_filename = str(raw_fn)
+                            task.filename = os.path.basename(raw_fn)
+                            task.save_path = raw_fn
                 elif st == 'error':
                     task.status = DownloadTask.STATUS_ERROR
                     task.error_message = data.get('error', 'Download failed')

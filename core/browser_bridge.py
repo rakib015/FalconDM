@@ -1223,25 +1223,59 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             "vivaldi": "vivaldi://extensions"
         }
         b_key = browser_name.lower().strip()
-        target_url = urls.get(b_key, "http://127.0.0.1:9666/")
+        target_url = urls.get(b_key, "chrome://extensions")
         
-        commands = {
-            "chrome": ["cmd", "/c", "start", "chrome", target_url],
-            "edge": ["cmd", "/c", "start", "msedge", target_url],
-            "brave": ["cmd", "/c", "start", "brave", target_url],
-            "opera": ["cmd", "/c", "start", "opera", target_url],
-            "firefox": ["cmd", "/c", "start", "firefox", target_url]
+        # Check standard browser install locations on Windows
+        exe_candidates = {
+            "chrome": [
+                os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+            ],
+            "edge": [
+                os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+                os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+            ],
+            "brave": [
+                os.path.expandvars(r"%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe"),
+                os.path.expandvars(r"%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe"),
+            ],
+            "opera": [
+                os.path.expandvars(r"%LocalAppData%\Programs\Opera\launcher.exe"),
+                os.path.expandvars(r"%ProgramFiles%\Opera\launcher.exe"),
+            ],
+            "firefox": [
+                os.path.expandvars(r"%ProgramFiles%\Mozilla Firefox\firefox.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe"),
+            ]
         }
-        cmd = commands.get(b_key)
+
+        found_exe = None
+        for path in exe_candidates.get(b_key, []):
+            if os.path.isfile(path):
+                found_exe = path
+                break
+
         try:
-            if cmd:
-                subprocess.Popen(cmd, shell=True)
+            if found_exe:
+                subprocess.Popen([found_exe, target_url])
             else:
-                import webbrowser
-                webbrowser.open("http://127.0.0.1:9666/")
+                # Fallback to system protocol/shell launch
+                cmd_names = {
+                    "chrome": "chrome",
+                    "edge": "msedge",
+                    "brave": "brave",
+                    "opera": "opera",
+                    "firefox": "firefox"
+                }
+                c_name = cmd_names.get(b_key, "chrome")
+                subprocess.Popen(f'start "" {c_name} "{target_url}"', shell=True)
         except Exception:
             import webbrowser
-            webbrowser.open("http://127.0.0.1:9666/")
+            try:
+                webbrowser.open(target_url)
+            except Exception:
+                pass
 
     def _send_html(self, body: bytes):
         self.send_response(200)

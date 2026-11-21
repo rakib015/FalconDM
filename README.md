@@ -1,9 +1,9 @@
 <div align="center">
   <img src="assets/logo.png" alt="FalconDM Logo" width="180"/>
-  <h1>⚡ FalconDM v2.8.0</h1>
+  <h1>⚡ FalconDM v2.8.1</h1>
   <p><strong>The Ultimate Free & Open-Source IDM Alternative</strong></p>
   <p>
-    <a href="https://github.com/rakib015/FalconDM/releases/tag/v2.8.0"><img src="https://img.shields.io/badge/release-v2.8.0-blue.svg" alt="Release"></a>
+    <a href="https://github.com/rakib015/FalconDM/releases/tag/v2.8.1"><img src="https://img.shields.io/badge/release-v2.8.1-blue.svg" alt="Release"></a>
     <img src="https://img.shields.io/badge/license-GPLv3%20%2F%20MIT-emerald.svg" alt="License">
     <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational.svg" alt="Platform">
     <img src="https://img.shields.io/badge/python-3.10%2B-brightgreen.svg" alt="Python">
@@ -12,7 +12,7 @@
 
 **FalconDM** is a high-speed, feature-packed, 100% free download accelerator, media grabber, and multi-protocol bridge built from the ground up to match and exceed the capabilities of Internet Download Manager (IDM), aria2, JDownloader 2, and Motrix.
 
-![FalconDM v2.8.0 UI Preview](assets/ui_preview.png)
+![FalconDM v2.8.1 UI Preview](assets/ui_preview.png)
 
 ---
 
@@ -205,6 +205,14 @@ FalconDM includes a native browser extension for Chrome, Edge, Brave, Opera, and
 
 ### Or via Terminal
 ```powershell
+# 1. Clone repository or download ZIP from GitHub
+git clone https://github.com/rakib015/FalconDM.git
+cd FalconDM
+
+# 2. Install requirements
+pip install -r requirements.txt
+
+# 3. Launch FalconDM
 python main.py
 ```
 

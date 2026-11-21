@@ -22,22 +22,49 @@ Write-Host ""
 $RootDir = $PSScriptRoot
 if (-not $RootDir) { $RootDir = (Get-Location).Path }
 $ExtDir = Join-Path $RootDir "browser_extension"
-$NativeBat = Join-Path $RootDir "core\native_host.bat"
-$ChromeManifest = Join-Path $RootDir "core\com.falcondm.downloader.json"
-$FirefoxManifest = Join-Path $RootDir "core\com.falcondm.downloader_firefox.json"
+if (-not (Test-Path (Join-Path $ExtDir "manifest.json"))) {
+    $InternalExt = Join-Path $RootDir "_internal\browser_extension"
+    if (Test-Path (Join-Path $InternalExt "manifest.json")) {
+        $ExtDir = $InternalExt
+    }
+}
 
-# Update manifests with absolute paths
+$HostBin = Join-Path $RootDir "FalconDM.exe"
+if (-not (Test-Path $HostBin)) {
+    $HostBin = Join-Path $RootDir "dist\FalconDM\FalconDM.exe"
+}
+if (-not (Test-Path $HostBin)) {
+    $HostBin = Join-Path $RootDir "core\native_host.bat"
+}
+if (-not (Test-Path $HostBin)) {
+    $HostBin = Join-Path $RootDir "native_host.bat"
+}
+
+# Use AppData to ensure writes succeed without Admin permissions
+$TargetDir = Join-Path $env:APPDATA "FalconDM\native_messaging"
+if (-not (Test-Path $TargetDir)) { New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null }
+
+$ChromeManifest = Join-Path $TargetDir "com.falcondm.downloader.json"
+$FirefoxManifest = Join-Path $TargetDir "com.falcondm.downloader_firefox.json"
+
 try {
-    if (Test-Path $ChromeManifest) {
-        $c = Get-Content $ChromeManifest -Raw | ConvertFrom-Json
-        $c.path = $NativeBat
-        $c | ConvertTo-Json -Depth 5 | Set-Content $ChromeManifest -Encoding UTF8
+    $c = @{
+        name = "com.falcondm.downloader"
+        description = "FalconDM Native Messaging Host"
+        path = $HostBin
+        type = "stdio"
+        allowed_origins = @("chrome-extension://kbekmfgcpjeiiiehpffkapbpncbpfjcj/")
     }
-    if (Test-Path $FirefoxManifest) {
-        $f = Get-Content $FirefoxManifest -Raw | ConvertFrom-Json
-        $f.path = $NativeBat
-        $f | ConvertTo-Json -Depth 5 | Set-Content $FirefoxManifest -Encoding UTF8
+    $c | ConvertTo-Json -Depth 5 | Set-Content $ChromeManifest -Encoding UTF8
+
+    $f = @{
+        name = "com.falcondm.downloader"
+        description = "FalconDM Native Messaging Host for Firefox"
+        path = $HostBin
+        type = "stdio"
+        allowed_extensions = @("falcondm-turbo@falcondm.local")
     }
+    $f | ConvertTo-Json -Depth 5 | Set-Content $FirefoxManifest -Encoding UTF8
 } catch {}
 
 # Registry entries (HKCU - No Administrator privileges needed)
@@ -62,7 +89,10 @@ Set-ItemProperty -Path $FfReg -Name "(Default)" -Value $FirefoxManifest -Force |
 Write-Host "[OK] Native Messaging Hosts registered in Windows Registry." -ForegroundColor Green
 
 # Copy path to clipboard
-Set-Clipboard -Value $ExtDir
+if (Test-Path $ExtDir) {
+    Set-Clipboard -Value $ExtDir
+    Write-Host "[OK] Extension path copied to Clipboard: $ExtDir" -ForegroundColor Green
+}
 Write-Host "[OK] Extension path copied to Clipboard: $ExtDir" -ForegroundColor Green
 Write-Host ""
 

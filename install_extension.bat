@@ -6,6 +6,11 @@ color 0B
 set "ROOT_DIR=%~dp0"
 if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 set "EXT_DIR=%ROOT_DIR%\browser_extension"
+if not exist "%EXT_DIR%\manifest.json" (
+    if exist "%ROOT_DIR%\_internal\browser_extension\manifest.json" (
+        set "EXT_DIR=%ROOT_DIR%\_internal\browser_extension"
+    )
+)
 
 cls
 echo ========================================================================
@@ -16,7 +21,11 @@ echo.
 
 :: 1. Run Native Host Registration
 echo [*] Step 1/3: Registering Native Messaging Host in Windows Registry...
-call "%ROOT_DIR%\register_native_host.bat" >nul 2>&1
+if exist "%ROOT_DIR%\register_native_host.bat" (
+    call "%ROOT_DIR%\register_native_host.bat" >nul 2>&1
+) else if exist "%ROOT_DIR%\_internal\register_native_host.bat" (
+    call "%ROOT_DIR%\_internal\register_native_host.bat" >nul 2>&1
+)
 echo     [OK] Native Messaging Host linked for Chrome, Edge, Brave and Firefox!
 echo.
 
