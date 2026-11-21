@@ -203,33 +203,8 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
             command=self._launch_preview
         )
 
-        # Open File Button (appears when finished)
-        self.btn_open_file = ctk.CTkButton(
-            btn_bar,
-            text="🚀 Open File",
-            width=100,
-            height=32,
-            corner_radius=6,
-            fg_color="#2563eb",
-            hover_color="#1d4ed8",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            command=self._open_file
-        )
-        # Open Folder Button (appears when finished)
-        self.btn_open_folder = ctk.CTkButton(
-            btn_bar,
-            text="📂 Open Folder",
-            width=110,
-            height=32,
-            corner_radius=6,
-            fg_color="#334155",
-            hover_color="#475569",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            command=self._open_folder
-        )
-
-        # Hide to background button
-        btn_hide = ctk.CTkButton(
+        # Hide to background / Close button
+        self.btn_hide = ctk.CTkButton(
             btn_bar,
             text="Hide to Background",
             width=135,
@@ -241,7 +216,7 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
             font=ctk.CTkFont(size=11),
             command=self.destroy
         )
-        btn_hide.pack(side="right", padx=14, pady=11)
+        self.btn_hide.pack(side="right", padx=14, pady=11)
 
         # 3. Automation Checkboxes (Packed bottom above action bar)
         opts_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -498,40 +473,97 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
 
     def _sync_buttons(self):
         st = getattr(self.task, "status", "")
-        if st == "Downloading":
-            # Running state -> Show Pause
-            if hasattr(self, 'btn_pause') and self.btn_pause.winfo_exists():
-                self.btn_pause.configure(text="⏸ Pause", fg_color="#f59e0b", hover_color="#d97706")
-            if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
-                self.btn_speed_resume.configure(text="⏸ Pause", fg_color="#f59e0b", hover_color="#d97706")
-            if hasattr(self, 'btn_cancel') and self.btn_cancel.winfo_exists():
-                self.btn_cancel.configure(text="✕ Cancel", fg_color="#ef4444", hover_color="#dc2626")
-            if hasattr(self, 'btn_speed_cancel') and self.btn_speed_cancel.winfo_exists():
-                self.btn_speed_cancel.configure(text="✕ Cancel", fg_color="#ef4444", hover_color="#dc2626")
-            if hasattr(self, 'btn_open_file') and self.btn_open_file.winfo_exists():
-                self.btn_open_file.pack_forget()
-            if hasattr(self, 'btn_open_folder') and self.btn_open_folder.winfo_exists():
-                self.btn_open_folder.pack_forget()
+        palette = self.get_theme_palette()
 
-        # Update Live Preview in VLC button
+        # Update Live Preview in VLC button (only valid for streaming media while actively downloading or paused)
         if hasattr(self, 'btn_preview') and self.btn_preview.winfo_exists():
             can_preview = hasattr(self.task, "can_preview_media") and self.task.can_preview_media()
-            if can_preview and st != "Completed":
+            if can_preview and st not in ("Completed", "Canceled", "Error"):
                 self.btn_preview.pack(side="left", padx=4, pady=11)
             else:
                 self.btn_preview.pack_forget()
 
-        elif st == "Completed":
-            # Completed state -> Show Open File and Open Folder
-            palette = self.get_theme_palette()
+        if st == "Downloading":
+            # Running state -> Show Pause & Cancel
             if hasattr(self, 'btn_pause') and self.btn_pause.winfo_exists():
-                self.btn_pause.configure(text="🚀 Open File", fg_color=palette.get("primary", "#2563eb"), hover_color=palette.get("primary_hover", "#1d4ed8"))
-            if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
-                self.btn_speed_resume.configure(text="🚀 Open File", fg_color=palette.get("primary", "#2563eb"), hover_color=palette.get("primary_hover", "#1d4ed8"))
+                self.btn_pause.configure(
+                    text="⏸ Pause",
+                    fg_color="#451a03",
+                    hover_color="#78350f",
+                    border_width=1,
+                    border_color="#d97706",
+                    text_color="#fcd34d",
+                    command=self._toggle_pause
+                )
             if hasattr(self, 'btn_cancel') and self.btn_cancel.winfo_exists():
-                self.btn_cancel.configure(text="📂 Open Folder", fg_color="#334155", hover_color="#475569")
+                self.btn_cancel.configure(
+                    text="✕ Cancel",
+                    fg_color="#450a0a",
+                    hover_color="#7f1d1d",
+                    border_width=1,
+                    border_color="#dc2626",
+                    text_color="#fca5a5",
+                    command=self._cancel
+                )
+            if hasattr(self, 'btn_hide') and self.btn_hide.winfo_exists():
+                self.btn_hide.configure(text="Hide to Background", width=135)
+
+            # Speed frame buttons
+            if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
+                self.btn_speed_resume.configure(
+                    text="⏸ Pause",
+                    fg_color="#451a03",
+                    hover_color="#78350f",
+                    border_width=1,
+                    border_color="#d97706",
+                    text_color="#fcd34d",
+                    command=self._toggle_pause
+                )
+                if not self.btn_speed_resume.winfo_ismapped():
+                    self.btn_speed_resume.pack(side="right", padx=(0, 4))
             if hasattr(self, 'btn_speed_cancel') and self.btn_speed_cancel.winfo_exists():
-                self.btn_speed_cancel.configure(text="📂 Open Folder", fg_color="#334155", hover_color="#475569")
+                self.btn_speed_cancel.configure(
+                    text="✕ Cancel",
+                    fg_color="#450a0a",
+                    hover_color="#7f1d1d",
+                    border_width=1,
+                    border_color="#dc2626",
+                    text_color="#fca5a5",
+                    command=self._cancel
+                )
+                if not self.btn_speed_cancel.winfo_ismapped():
+                    self.btn_speed_cancel.pack(side="right", padx=(4, 0))
+
+        elif st == "Completed":
+            # Completed state -> Show Open File and Open Folder, and Close
+            if hasattr(self, 'btn_pause') and self.btn_pause.winfo_exists():
+                self.btn_pause.configure(
+                    text="🚀 Open File",
+                    fg_color=palette.get("primary", "#2563eb"),
+                    hover_color=palette.get("primary_hover", "#1d4ed8"),
+                    border_width=1,
+                    border_color=palette.get("accent", "#38bdf8"),
+                    text_color="#ffffff",
+                    command=self._open_file
+                )
+            if hasattr(self, 'btn_cancel') and self.btn_cancel.winfo_exists():
+                self.btn_cancel.configure(
+                    text="📂 Open Folder",
+                    fg_color="#1e293b",
+                    hover_color="#334155",
+                    border_width=1,
+                    border_color="#475569",
+                    text_color="#38bdf8",
+                    command=self._open_folder
+                )
+            if hasattr(self, 'btn_hide') and self.btn_hide.winfo_exists():
+                self.btn_hide.configure(text="✕ Close", width=90)
+
+            # Hide redundant pause/cancel buttons in speed frame when download completed
+            if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
+                self.btn_speed_resume.pack_forget()
+            if hasattr(self, 'btn_speed_cancel') and self.btn_speed_cancel.winfo_exists():
+                self.btn_speed_cancel.pack_forget()
 
             # Auto-reveal Integrity & Security Card upon download completion
             if not getattr(self, "_completion_card_shown", False):
@@ -543,34 +575,62 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
                 self._start_hash_calculation()
 
         else:
-            # Paused / Queued / Error / Canceled -> Show Start/Resume
+            # Paused / Queued / Error / Canceled -> Show Start/Resume & Cancel
             if hasattr(self, 'btn_pause') and self.btn_pause.winfo_exists():
-                self.btn_pause.configure(text="▶ Start / Resume", fg_color="#10b981", hover_color="#059669")
-            if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
-                self.btn_speed_resume.configure(text="▶ Start / Resume", fg_color="#10b981", hover_color="#059669")
+                self.btn_pause.configure(
+                    text="▶ Start / Resume",
+                    fg_color="#064e3b",
+                    hover_color="#047857",
+                    border_width=1,
+                    border_color="#10b981",
+                    text_color="#34d399",
+                    command=self._toggle_pause
+                )
             if hasattr(self, 'btn_cancel') and self.btn_cancel.winfo_exists():
-                self.btn_cancel.configure(text="✕ Cancel", fg_color="#ef4444", hover_color="#dc2626")
-            if hasattr(self, 'btn_speed_cancel') and self.btn_speed_cancel.winfo_exists():
-                self.btn_speed_cancel.configure(text="✕ Cancel", fg_color="#ef4444", hover_color="#dc2626")
-            if hasattr(self, 'btn_open_file') and self.btn_open_file.winfo_exists():
-                self.btn_open_file.pack_forget()
-            if hasattr(self, 'btn_open_folder') and self.btn_open_folder.winfo_exists():
-                self.btn_open_folder.pack_forget()
+                self.btn_cancel.configure(
+                    text="✕ Cancel",
+                    fg_color="#450a0a",
+                    hover_color="#7f1d1d",
+                    border_width=1,
+                    border_color="#dc2626",
+                    text_color="#fca5a5",
+                    command=self._cancel
+                )
+            if hasattr(self, 'btn_hide') and self.btn_hide.winfo_exists():
+                self.btn_hide.configure(text="Hide to Background", width=135)
 
-        # Update Live Preview in VLC button
-        if hasattr(self, 'btn_preview') and self.btn_preview.winfo_exists():
-            can_preview = hasattr(self.task, "can_preview_media") and self.task.can_preview_media()
-            if can_preview and st != "Completed":
-                self.btn_preview.pack(side="left", padx=4, pady=11)
-            else:
-                self.btn_preview.pack_forget()
+            # Speed frame buttons
+            if hasattr(self, 'btn_speed_resume') and self.btn_speed_resume.winfo_exists():
+                self.btn_speed_resume.configure(
+                    text="▶ Resume",
+                    fg_color="#064e3b",
+                    hover_color="#047857",
+                    border_width=1,
+                    border_color="#10b981",
+                    text_color="#34d399",
+                    command=self._toggle_pause
+                )
+                if not self.btn_speed_resume.winfo_ismapped():
+                    self.btn_speed_resume.pack(side="right", padx=(0, 4))
+            if hasattr(self, 'btn_speed_cancel') and self.btn_speed_cancel.winfo_exists():
+                self.btn_speed_cancel.configure(
+                    text="✕ Cancel",
+                    fg_color="#450a0a",
+                    hover_color="#7f1d1d",
+                    border_width=1,
+                    border_color="#dc2626",
+                    text_color="#fca5a5",
+                    command=self._cancel
+                )
+                if not self.btn_speed_cancel.winfo_ismapped():
+                    self.btn_speed_cancel.pack(side="right", padx=(4, 0))
 
         # Update Log button styling on error
         if hasattr(self, 'btn_view_log') and self.btn_view_log.winfo_exists():
             if st in ("Error", "Auto-reconnecting"):
                 self.btn_view_log.configure(text="⚠️ Error Log", fg_color="#ef4444", hover_color="#dc2626")
             else:
-                self.btn_view_log.configure(text="📜 Log", fg_color="#334155", hover_color="#475569")
+                self.btn_view_log.configure(text="📜 Log", fg_color="#111827", hover_color="#1f2937")
 
     def _open_log(self):
         try:
@@ -630,11 +690,17 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _open_file(self):
-        if os.path.exists(self.task.save_path):
+        target_path = os.path.abspath(self.task.save_path)
+        if os.path.exists(target_path):
             try:
-                os.startfile(self.task.save_path)
+                os.startfile(target_path)
             except Exception:
-                pass
+                try:
+                    subprocess.run(f'start "" "{target_path}"', shell=True)
+                except Exception:
+                    pass
+        elif os.path.exists(os.path.dirname(target_path)):
+            self._open_folder()
 
     def _open_folder(self):
         target_path = os.path.abspath(self.task.save_path)

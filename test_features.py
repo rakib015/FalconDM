@@ -153,7 +153,12 @@ class TestFalconDMEnhancements(unittest.TestCase):
         self.assertFalse(seg.kick_requested)
 
     def test_queue_reordering_and_priorities(self):
-        temp_file = "test_queue_temp.json"
+        temp_file = os.path.join(_ROOT, "test_queue_temp.json")
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
         manager = DownloadManager(data_file=temp_file)
         try:
             t1 = manager.create_task("https://example.com/1.zip", "1.zip", auto_start=False)
@@ -587,6 +592,35 @@ class TestFalconDMEnhancements(unittest.TestCase):
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    def test_floating_window_completed_button_sync(self):
+        """Verify that when a download finishes, buttons switch to 'Open File' / 'Open Folder' / 'Close'."""
+        import tkinter as tk
+        from gui.download_window import FloatingDownloadDialog
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            task = DownloadTask("sync_test_task", "https://example.com/test.zip", "test.zip")
+            task.status = "Completed"
+            dlg = FloatingDownloadDialog(root, task)
+
+            # When completed:
+            self.assertIn("Open File", dlg.btn_pause.cget("text"))
+            self.assertIn("Open Folder", dlg.btn_cancel.cget("text"))
+            self.assertIn("Close", dlg.btn_hide.cget("text"))
+            self.assertFalse(dlg.btn_speed_resume.winfo_ismapped())
+            self.assertFalse(dlg.btn_speed_cancel.winfo_ismapped())
+
+            # Switch to Downloading:
+            task.status = "Downloading"
+            dlg._sync_buttons()
+            self.assertIn("Pause", dlg.btn_pause.cget("text"))
+            self.assertIn("Cancel", dlg.btn_cancel.cget("text"))
+            self.assertIn("Hide to Background", dlg.btn_hide.cget("text"))
+
+            dlg.destroy()
+        finally:
+            root.destroy()
 
 
 if __name__ == "__main__":
