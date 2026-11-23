@@ -1,11 +1,18 @@
 import re
+import os
+import base64
 import urllib.parse
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import requests
 try:
     from bs4 import BeautifulSoup
 except ImportError:
     BeautifulSoup = None
+
+try:
+    from core.config_manager import config_store
+except ImportError:
+    config_store = None
 
 from core.logger import falcon_logger
 
@@ -19,14 +26,59 @@ def _attr_to_str(val: Any) -> str:
         return "".join(str(x) for x in val)
     return str(val)
 
+def unpack_wrapped_url(url: str) -> Optional[str]:
+    """Module-level convenience wrapper for HostResolver.unpack_wrapped_url."""
+    return HostResolver.unpack_wrapped_url(url)
+
 class HostResolver:
-    """Detects and resolves direct download links for cloud storage and file hosts."""
+    """Detects and resolves direct download links for cloud storage, git mirrors, legacy formats, and research repositories."""
+
+    ARXIV_RE = re.compile(
+        r'(?:arxiv[:/]|arxiv\.org/(?:abs|pdf)/|alphaxiv\.org/abs/|papers/)(\d{4}\.\d{4,5}(?:v\d+)?|[a-z\-]+/\d{7})',
+        re.IGNORECASE
+    )
+
+    @staticmethod
+    def unpack_wrapped_url(url: str) -> Optional[str]:
+        """Decodes legacy thunder://, flashget://, and qqdl:// URLs."""
+        if not url:
+            return None
+        u = url.strip()
+        scheme, _, payload = u.partition("://")
+        scheme = scheme.lower()
+        if scheme not in ("thunder", "flashget", "qqdl"):
+            return None
+        
+        clean_payload = payload.split("&")[0].rstrip("/")
+        try:
+            raw = base64.b64decode(clean_payload + "=" * (-len(clean_payload) % 4))
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                text = raw.decode("gbk", errors="ignore")
+        except Exception:
+            return None
+            
+        if scheme == "thunder":
+            if text.startswith("AA") and text.endswith("ZZ"):
+                text = text[2:-2]
+        elif scheme == "flashget":
+            text = text.replace("[FLASHGET]", "").replace("[/FLASHGET]", "")
+            
+        text = text.strip()
+        if text.startswith("http://") or text.startswith("https://") or text.startswith("ftp://"):
+            return text
+        return None
 
     @staticmethod
     def is_resolvable(url: str) -> bool:
         if not url:
             return False
-        u = url.lower()
+        u = url.lower().strip()
+        if u.startswith(("thunder://", "flashget://", "qqdl://")):
+            return True
+        if HostResolver.ARXIV_RE.search(u):
+            return True
         return any(domain in u for domain in (
             "drive.google.com",
             "drive.usercontent.google.com",
@@ -35,19 +87,47 @@ class HostResolver:
             "onedrive.live.com",
             "mediafire.com",
             "github.com",
+            "githubusercontent.com",
+            "huggingface.co",
+            "hf.co",
             "pixeldrain.com"
         ))
 
     @staticmethod
     def resolve_url(url: str, timeout: int = 12) -> Dict[str, Any]:
         """
-        Attempts to resolve a direct high-speed downloadable link from a file host page.
+        Attempts to resolve a direct high-speed downloadable link with mirror fallback.
         Returns dict with:
           resolved_url: str (the direct download link)
           filename: Optional[str]
           headers: Dict[str, str]
           host: str
+          mirrors: List[str]
+          category: Optional[str]
         """
+        if not url:
+            return {"resolved_url": "", "filename": None, "headers": {}, "host": "Direct", "mirrors": []}
+
+        # 0. Check legacy wrapped links (Thunder / FlashGet / QQDL)
+        unwrapped = HostResolver.unpack_wrapped_url(url)
+        if unwrapped:
+            falcon_logger.logger.info(f"HostResolver: Unwrapped legacy link {url[:30]}... -> {unwrapped}")
+            if HostResolver.is_resolvable(unwrapped):
+                inner_res = HostResolver.resolve_url(unwrapped, timeout=timeout)
+                inner_res["original_wrapped_url"] = url
+                return inner_res
+            return {
+                "resolved_url": unwrapped,
+                "filename": os.path.basename(urllib.parse.urlparse(unwrapped).path) or None,
+                "headers": {"User-Agent": DEFAULT_UA},
+                "host": "Unwrapped Link",
+                "mirrors": []
+            }
+
+        # 0b. arXiv Research Papers
+        if HostResolver.ARXIV_RE.search(url):
+            return HostResolver._resolve_arxiv(url, timeout)
+
         parsed = urllib.parse.urlparse(url)
         netloc = parsed.netloc.lower()
 
@@ -66,24 +146,28 @@ class HostResolver:
                     falcon_logger.logger.info(f"HostResolver: Converted Dropbox link to direct stream -> {res.get('resolved_url')[:80]}...")
                 return res
 
-            # 3. GitHub
-            if "github.com" in netloc:
+            # 3. HuggingFace Mirrors
+            if "huggingface.co" in netloc or "hf.co" in netloc:
+                return HostResolver._resolve_huggingface(url)
+
+            # 4. GitHub & GitHub Mirrors
+            if "github.com" in netloc or "githubusercontent.com" in netloc:
                 res = HostResolver._resolve_github(url)
                 return res
 
-            # 4. PixelDrain
+            # 5. PixelDrain
             if "pixeldrain.com" in netloc:
                 res = HostResolver._resolve_pixeldrain(url)
                 return res
 
-            # 5. MediaFire
+            # 6. MediaFire
             if "mediafire.com" in netloc:
                 res = HostResolver._resolve_mediafire(url, timeout)
                 if res.get("resolved_url") != url:
                     falcon_logger.logger.info(f"HostResolver: Resolved MediaFire link -> {res.get('resolved_url')[:80]}... (File: {res.get('filename')})")
                 return res
 
-            # 6. OneDrive / 1drv.ms
+            # 7. OneDrive / 1drv.ms
             if "1drv.ms" in netloc or "onedrive.live.com" in netloc:
                 res = HostResolver._resolve_onedrive(url, timeout)
                 return res
@@ -95,7 +179,8 @@ class HostResolver:
             "resolved_url": url,
             "filename": None,
             "headers": {},
-            "host": "Direct"
+            "host": "Direct",
+            "mirrors": []
         }
 
     @staticmethod
@@ -235,17 +320,124 @@ class HostResolver:
         # Handle github blob -> raw
         if "/blob/" in url:
             raw = url.replace("/blob/", "/raw/")
+            mirrors = [
+                f"https://gh-proxy.com/{raw}",
+                f"https://ghfast.top/{raw}",
+                f"https://ghproxy.net/{raw}"
+            ]
             return {
                 "resolved_url": raw,
                 "filename": None,
                 "headers": {"User-Agent": DEFAULT_UA},
-                "host": "GitHub Raw"
+                "host": "GitHub Raw",
+                "mirrors": mirrors
+            }
+        
+        # Check for GitHub Releases, Archives, or Raw files
+        u_lower = url.lower()
+        is_accel_candidate = (
+            "/releases/download/" in u_lower
+            or "/archive/" in u_lower
+            or "raw.githubusercontent.com" in u_lower
+            or "objects.githubusercontent.com" in u_lower
+            or "release-assets.githubusercontent.com" in u_lower
+        )
+        
+        accel_enabled = True
+        if config_store:
+            accel_enabled = config_store.get("github_acceleration_enabled", True)
+            
+        if is_accel_candidate and accel_enabled:
+            primary_mirror = f"https://gh-proxy.com/{url}"
+            mirrors = [
+                url,
+                f"https://ghfast.top/{url}",
+                f"https://ghproxy.net/{url}"
+            ]
+            fname = os.path.basename(urllib.parse.urlparse(url).path) or None
+            return {
+                "resolved_url": primary_mirror,
+                "filename": fname,
+                "headers": {"User-Agent": DEFAULT_UA},
+                "host": "GitHub Accelerated",
+                "mirrors": mirrors
+            }
+
+        return {
+            "resolved_url": url,
+            "filename": None,
+            "headers": {"User-Agent": DEFAULT_UA},
+            "host": "GitHub",
+            "mirrors": []
+        }
+
+    @staticmethod
+    def _resolve_huggingface(url: str) -> Dict[str, Any]:
+        accel_enabled = True
+        if config_store:
+            accel_enabled = config_store.get("huggingface_acceleration_enabled", True)
+        
+        parsed = urllib.parse.urlparse(url)
+        netloc = parsed.netloc.lower()
+        
+        if accel_enabled and ("huggingface.co" in netloc or "hf.co" in netloc):
+            mirror_netloc = "hf-mirror.com"
+            new_parsed = parsed._replace(netloc=mirror_netloc)
+            mirror_url = urllib.parse.urlunparse(new_parsed)
+            fname = os.path.basename(parsed.path) or None
+            return {
+                "resolved_url": mirror_url,
+                "filename": fname,
+                "headers": {"User-Agent": DEFAULT_UA},
+                "host": "HuggingFace Mirror",
+                "mirrors": [url]
             }
         return {
             "resolved_url": url,
             "filename": None,
             "headers": {"User-Agent": DEFAULT_UA},
-            "host": "GitHub"
+            "host": "HuggingFace",
+            "mirrors": []
+        }
+
+    @staticmethod
+    def _resolve_arxiv(url: str, timeout: int = 5) -> Dict[str, Any]:
+        m = HostResolver.ARXIV_RE.search(url)
+        if not m:
+            return {"resolved_url": url, "filename": None, "headers": {}, "host": "Direct", "mirrors": []}
+        
+        arxiv_id = m.group(1)
+        pdf_url = f"https://export.arxiv.org/pdf/{arxiv_id}.pdf"
+        alt_pdf = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+        title = None
+        
+        # Try fetching paper title from abstract page
+        try:
+            abs_url = f"https://export.arxiv.org/abs/{arxiv_id}"
+            resp = requests.get(abs_url, headers={"User-Agent": DEFAULT_UA}, timeout=timeout)
+            if resp.status_code == 200:
+                html = resp.text
+                m_title = re.search(r'<meta\s+name=["\']citation_title["\']\s+content=["\']([^"\']+)["\']', html)
+                if m_title:
+                    raw_title = m_title.group(1).strip()
+                    import html as html_module
+                    raw_title = html_module.unescape(raw_title)
+                    clean_title = re.sub(r'[\\/:*?"<>|\r\n\t]', '_', raw_title).strip()
+                    if clean_title:
+                        title = f"{clean_title}.pdf"
+        except Exception as e:
+            falcon_logger.logger.warning(f"ArXiv metadata fetch skipped: {e}")
+            
+        if not title:
+            title = f"arXiv_{arxiv_id.replace('/', '_')}.pdf"
+            
+        return {
+            "resolved_url": pdf_url,
+            "filename": title,
+            "headers": {"User-Agent": DEFAULT_UA},
+            "host": "arXiv",
+            "category": "Document",
+            "mirrors": [alt_pdf]
         }
 
     @staticmethod

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FalconDM - Turbo Download Accelerator",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "description": "Universal Browser Integration: Right-click download, auto-capture downloads, and floating Video Grabber for FalconDM (Chrome, Edge, Firefox, Brave, Opera, Arc).",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApcPE0LC4s3mhXexhrtE83D6b5AGRlfLVKtmtM7NMUw5bze3eXvDpVWjqKB+v4H0Nd2L7Or8Zz5K2S2ypI5Ptkw2eK53i7tmtPrp2UBAi17g0jI2ff7Ey3UxOvwFkSM1ByhQYxgQZmaajn5g55VFJA+kBL6K6iK0RAMASyuPlE6nS1s5eNaw5fq0k+pjt6ZRRtFpcUT5d6Hu8XO3zkAuMn2ZXNVKZcv7YzPqIhGJOE1tjYlNX9jiYYwcSC0vNaWfHblr9XJDk1CEL4wxBQ9VSM76OyAaapkuuQuPXfekCPbwAQYgLzbaqUQhxEFO4eRSfukvdEVttl0MB+Fy9hN5V7wIDAQAB",
   "icons": {

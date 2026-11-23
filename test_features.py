@@ -392,7 +392,7 @@ class TestFalconDMEnhancements(unittest.TestCase):
 
     def test_version_v2(self):
         import core
-        self.assertEqual(core.__version__, "2.8.1")
+        self.assertEqual(core.__version__, "2.8.2")
 
     def test_batch_manager_multidimensional_and_alpha(self):
         from core.batch_manager import BatchManager
@@ -621,6 +621,46 @@ class TestFalconDMEnhancements(unittest.TestCase):
             dlg.destroy()
         finally:
             root.destroy()
+
+
+    def test_v282_wrapped_links_and_acceleration(self):
+        """Verify Ghost-Downloader-3 enhancements: wrapped URLs, GitHub/HuggingFace/arXiv resolvers."""
+        from core.host_resolvers import unpack_wrapped_url, HostResolver
+        import json
+
+        # 1. Test wrapped links
+        thunder = "thunder://QUFodHRwczovL2V4YW1wbGUuY29tL3ZpZGVvLm1wNFpa"
+        self.assertEqual(unpack_wrapped_url(thunder), "https://example.com/video.mp4")
+
+        flashget = "Flashget://W0ZMQVNIR0VUXWh0dHBzOi8vZXhhbXBsZS5jb20vYXJjaGl2ZS56aXBbRkxBU0hHRVRd&1234"
+        self.assertEqual(unpack_wrapped_url(flashget), "https://example.com/archive.zip")
+
+        qqdl = "qqdl://aHR0cHM6Ly9leGFtcGxlLmNvbS9zb2Z0d2FyZS5leGU="
+        self.assertEqual(unpack_wrapped_url(qqdl), "https://example.com/software.exe")
+
+        # 2. Test GitHub acceleration
+        gh_rel = "https://github.com/user/repo/releases/download/v1.0.0/app.zip"
+        res_gh = HostResolver.resolve_url(gh_rel)
+        self.assertIn("gh-proxy.com", res_gh.get("resolved_url", ""))
+        self.assertTrue(len(res_gh.get("mirrors", [])) >= 2)
+
+        # 3. Test HuggingFace acceleration
+        hf_url = "https://huggingface.co/bert-base-uncased/resolve/main/pytorch_model.bin"
+        res_hf = HostResolver.resolve_url(hf_url)
+        self.assertIn("hf-mirror.com", res_hf.get("resolved_url", ""))
+        self.assertIn(hf_url, res_hf.get("mirrors", []))
+
+        # 4. Test arXiv resolver pattern
+        arxiv_url = "https://arxiv.org/abs/2301.00001"
+        self.assertTrue(HostResolver.is_resolvable(arxiv_url))
+
+        # 5. Version checks
+        import core
+        self.assertEqual(core.__version__, "2.8.2")
+
+        with open(os.path.join(_ROOT, "browser_extension", "manifest.json"), "r", encoding="utf-8") as f:
+            m = json.load(f)
+            self.assertEqual(m["version"], "2.8.2")
 
 
 if __name__ == "__main__":

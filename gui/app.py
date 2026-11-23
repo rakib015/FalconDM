@@ -662,7 +662,7 @@ class FalconDMApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("FalconDM v2.8.1 - High Speed Turbo Download Accelerator (Free IDM)")
+        self.title("FalconDM v2.8.2 - High Speed Turbo Download Accelerator (Free IDM)")
         self.geometry("1220x780")
         self.minsize(1040, 660)
 
@@ -766,6 +766,8 @@ class FalconDMApp(ctk.CTk):
         self.bind("<F5>", lambda e: self._refresh_table())
         self.bind("<Control-q>", lambda e: self._on_quick_look())
         self.bind("<Control-Q>", lambda e: self._on_quick_look())
+        self.bind("<Control-g>", lambda e: self._on_toggle_mirror_acceleration())
+        self.bind("<Control-G>", lambda e: self._on_toggle_mirror_acceleration())
         if hasattr(self, 'tree'):
             self.tree.bind("<Delete>", lambda e: self._on_click_delete())
             def _handle_space(e):
@@ -899,7 +901,7 @@ class FalconDMApp(ctk.CTk):
 
         brand_text_box = ctk.CTkFrame(brand_frame, fg_color="transparent")
         brand_text_box.pack(side="left", padx=(0, 12))
-        lbl_logo = ctk.CTkLabel(brand_text_box, text="FalconDM v2.8.1", font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"), text_color="#f8fafc")
+        lbl_logo = ctk.CTkLabel(brand_text_box, text="FalconDM v2.8.2", font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"), text_color="#f8fafc")
         lbl_logo.pack(anchor="w")
         lbl_tagline = ctk.CTkLabel(brand_text_box, text="TURBO ENGINE • 32X ACCELERATOR", font=ctk.CTkFont(family="Segoe UI", size=8, weight="bold"), text_color="#818cf8")
         lbl_tagline.pack(anchor="w", pady=(0, 0))
@@ -1192,6 +1194,7 @@ class FalconDMApp(ctk.CTk):
         menu.add_separator()
         menu.add_command(label="📈 Live Speed & Performance HUD", command=self._on_click_speed_hud)
         menu.add_command(label="🌐 Web Remote Dashboard (:9666)", command=self._on_click_web_remote)
+        menu.add_command(label="⚡ GitHub & HuggingFace Mirror Acceleration", command=self._on_toggle_mirror_acceleration)
         menu.add_command(label="🧩 Browser Extension Setup", command=self._on_click_browser_ext)
         menu.add_command(label="🔍 File Hash Verifier (SHA256)", command=self._on_click_checksum)
         menu.add_separator()
@@ -1202,7 +1205,7 @@ class FalconDMApp(ctk.CTk):
         menu.add_command(label="📦 Build Extension Store Packages (.zip)...", command=self._on_build_extension_packages)
         menu.add_separator()
         menu.add_command(label="📜 View Download Diagnostics & Error Logs", command=self._open_log_viewer)
-        menu.add_command(label="ℹ️ About FalconDM v2.8.1", command=self._show_about_dialog)
+        menu.add_command(label="ℹ️ About FalconDM v2.8.2", command=self._show_about_dialog)
 
         try:
             x = self.btn_tools.winfo_rootx()
@@ -1211,13 +1214,30 @@ class FalconDMApp(ctk.CTk):
         finally:
             menu.grab_release()
 
+    def _on_toggle_mirror_acceleration(self):
+        curr = config_store.get("github_acceleration_enabled", True)
+        new_val = not curr
+        config_store.set("github_acceleration_enabled", new_val)
+        config_store.set("huggingface_acceleration_enabled", new_val)
+        status_str = "ENABLED (Auto Mirror Fallback: gh-proxy.com, ghfast.top, hf-mirror.com)" if new_val else "DISABLED (Direct Connections Only)"
+        messagebox.showinfo(
+            "Mirror Acceleration",
+            f"⚡ GitHub & HuggingFace Mirror Acceleration is now:\n\n{status_str}\n\n"
+            "When enabled, GitHub releases, raw assets, source archives, and HuggingFace models/datasets "
+            "are routed through high-speed mirrors with seamless auto-failover."
+        )
+
     def _show_about_dialog(self):
         messagebox.showinfo(
-            "About FalconDM v2.8.1",
-            "FalconDM v2.8.1 (Release 2.8.1)\n\n"
+            "About FalconDM v2.8.2",
+            "FalconDM v2.8.2 (Release 2.8.2)\n\n"
             "High-Speed Turbo Segmented Download Accelerator\n\n"
             "• Up to 32 Parallel Segmented Connection Streams\n"
             "• Universal aria2 & Motrix JSON-RPC Bridge (:6800 / :9666)\n"
+            "• GitHub & HuggingFace Mirror Acceleration with Multi-Mirror Auto-Failover\n"
+            "• Thunder, FlashGet & QQ Xuanfeng (qqdl) Legacy Link Decoders\n"
+            "• arXiv Academic Paper Title & Direct PDF Resolver\n"
+            "• Shadow DOM Encapsulated Browser Video Grabber with Active Media Scoring\n"
             "• JDownloader & pyLoad Click'n'Load v2 Decryption\n"
             "• RFC 5854 Metalink Multi-Mirror Acceleration (.meta4)\n"
             "• Cryptographic Integrity Auto-Verification (SHA-256/MD5)\n"
@@ -1226,7 +1246,7 @@ class FalconDMApp(ctk.CTk):
             "• Anti-Corruption Non-Range Fallback & In-Flight Demotion\n"
             "• Multi-Thread Video & Audio Stream Grabber\n"
             "• Automated Queue Scheduler & Dynamic Bandwidth Limiter\n\n"
-            "Status: v2.8.1 Active & Ready"
+            "Status: v2.8.2 Active & Ready"
         )
 
     def _build_sidebar(self):
@@ -1971,12 +1991,16 @@ class FalconDMApp(ctk.CTk):
                 self.bring_to_front()
 
                 # Resolve cloud storage links if applicable
+                mirrors = []
                 if HostResolver.is_resolvable(url):
                     try:
                         resolved = HostResolver.resolve_url(url)
                         url = resolved.get("resolved_url") or url
                         if not filename and resolved.get("filename"):
                             filename = resolved["filename"]
+                        mirrors = resolved.get("mirrors") or []
+                        if resolved.get("category"):
+                            guessed_cat = resolved["category"]
                         if resolved.get("headers"):
                             merged = dict(headers)
                             merged.update(resolved["headers"])
@@ -2000,6 +2024,7 @@ class FalconDMApp(ctk.CTk):
                         category=target_cat,
                         headers=headers,
                         queue_name=queue_name,
+                        mirrors=mirrors,
                         auto_start=True
                     )
                     notification_manager.play_start_sound()
@@ -2051,6 +2076,7 @@ class FalconDMApp(ctk.CTk):
                         category=guessed_cat,
                         headers=headers,
                         queue_name=queue_name,
+                        mirrors=mirrors,
                         auto_start=True
                     )
                     notification_manager.play_start_sound()
@@ -2098,12 +2124,16 @@ class FalconDMApp(ctk.CTk):
             pass
 
         # Cloud Storage Direct Link Resolution (Google Drive, Dropbox, MediaFire, PixelDrain, GitHub)
+        mirrors = []
         try:
             if HostResolver.is_resolvable(url):
                 resolved = HostResolver.resolve_url(url)
                 url = resolved.get("resolved_url") or url
                 if not custom_filename and resolved.get("filename"):
                     custom_filename = resolved["filename"]
+                mirrors = resolved.get("mirrors") or []
+                if resolved.get("category"):
+                    category = resolved["category"]
                 if resolved.get("headers"):
                     merged_headers = dict(headers or {})
                     merged_headers.update(resolved["headers"])
@@ -2146,6 +2176,7 @@ class FalconDMApp(ctk.CTk):
             num_connections=num_threads or config_store.get("default_threads", 32),
             category=category,
             headers=headers or {},
+            mirrors=mirrors,
             auto_start=auto_start
         )
         if auto_start:

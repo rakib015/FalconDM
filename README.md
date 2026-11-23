@@ -1,9 +1,9 @@
 <div align="center">
   <img src="assets/logo.png" alt="FalconDM Logo" width="180"/>
-  <h1>⚡ FalconDM v2.8.1</h1>
+  <h1>⚡ FalconDM v2.8.2</h1>
   <p><strong>The Ultimate Free & Open-Source IDM Alternative</strong></p>
   <p>
-    <a href="https://github.com/rakib015/FalconDM/releases/tag/v2.8.1"><img src="https://img.shields.io/badge/release-v2.8.1-blue.svg" alt="Release"></a>
+    <a href="https://github.com/rakib015/FalconDM/releases/tag/v2.8.2"><img src="https://img.shields.io/badge/release-v2.8.2-blue.svg" alt="Release"></a>
     <img src="https://img.shields.io/badge/license-GPLv3%20%2F%20MIT-emerald.svg" alt="License">
     <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational.svg" alt="Platform">
     <img src="https://img.shields.io/badge/python-3.10%2B-brightgreen.svg" alt="Python">
@@ -127,6 +127,12 @@
 ### 21. 🎬 Sequential Stream Mode & Live VLC Preview (`core/engine.py` & `gui/app.py`)
 - Prioritizes container headers (head) and metadata/cues (tail) before sequentially streaming the file.
 - Click **"🎬 Play in VLC"** right in the floating download window or right-click context menu to start watching movies/videos in real-time before the download completes.
+
+### 22. ⚡ GitHub & HuggingFace Mirror Acceleration & Legacy Link Decoders (`core/host_resolvers.py` & Extension)
+- **GitHub & HuggingFace Mirror Acceleration**: Automatically accelerates GitHub releases, raw assets, archives, and HuggingFace models/datasets using global edge mirrors (`gh-proxy.com`, `ghfast.top`, `ghproxy.net`, `hf-mirror.com`) with automatic failover to direct URLs.
+- **Legacy Link Decoders**: Unpacks legacy download client URLs (`thunder://`, `flashget://`, `qqdl://`) directly to native HTTP/HTTPS links.
+- **arXiv Research Paper Resolver**: Auto-extracts official research paper metadata, clean titles, and resolves directly to download-ready PDFs.
+- **Shadow DOM Browser Grabber**: Encapsulated Shadow DOM isolation (`falcondm-media-overlay`) preventing host CSS pollution, weighted active media scoring heuristic (`playing * 1e9 + readyState * 1e6 + area`), and smooth drag repositioning.
 
 ### 22. 🌙 Windows Sleep Prevention (`core/platform_utils.py` & `core/state_manager.py`)
 - Integrates with the Windows `SetThreadExecutionState` API to prevent the operating system from going to sleep or hibernating during active downloads, ensuring uninterrupted overnight downloads.

@@ -50,14 +50,19 @@ class ClipboardWatcher:
             self._last_content = ""
 
     def is_downloadable(self, text: str) -> bool:
-        """Determines if the copied text is a valid download, media stream, or cloud host link."""
+        """Determines if the copied text is a valid download, media stream, cloud host, or mirror link."""
         if not text:
             return False
 
         clean_text = text.strip()
+        clean_lower = clean_text.lower()
 
-        # 1. Magnet links
-        if clean_text.lower().startswith("magnet:?xt=urn:btih:"):
+        # 1. Magnet links & Legacy Wrapped Download Protocols (Thunder, FlashGet, QQ Xuanfeng)
+        if clean_lower.startswith(("magnet:?xt=urn:btih:", "thunder://", "flashget://", "qqdl://")):
+            return True
+
+        # 1b. arXiv paper notation (e.g. arxiv:1706.03762)
+        if clean_lower.startswith("arxiv:"):
             return True
 
         # 2. Must be HTTP/HTTPS
@@ -71,6 +76,10 @@ class ClipboardWatcher:
             query = parsed.query.lower()
         except Exception:
             return False
+
+        # 2b. Research repositories, AI model hubs & Git platforms
+        if any(h in netloc for h in ("arxiv.org", "alphaxiv.org", "huggingface.co", "hf.co", "github.com", "githubusercontent.com")):
+            return True
 
         # 3. Known Media Streaming Sites
         if any(domain in netloc for domain in MEDIA_DOMAINS):

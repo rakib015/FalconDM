@@ -1,5 +1,5 @@
 #define MyAppName "FalconDM"
-#define MyAppVersion "2.8.1"
+#define MyAppVersion "2.8.2"
 #define MyAppPublisher "FalconDM Community"
 #define MyAppURL "https://falcondm.local"
 #define MyAppExeName "FalconDM.exe"
@@ -17,7 +17,7 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist_installer
-OutputBaseFilename=FalconDM-Setup-v2.8.1
+OutputBaseFilename=FalconDM-Setup-v2.8.2
 SetupIconFile=assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

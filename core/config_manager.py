@@ -26,7 +26,11 @@ DEFAULT_SETTINGS = {
     "auto_upload_telegram_chat_id": "",
     "auto_upload_delete_local": False,
     "ui_theme_accent": "Cyberpunk Cyan",
-    "auto_speed_optimizer": True
+    "auto_speed_optimizer": True,
+    "github_acceleration_enabled": True,
+    "huggingface_acceleration_enabled": True,
+    "wrapped_links_enabled": True,
+    "arxiv_resolver_enabled": True
 }
 
 THEME_PALETTES: Dict[str, Dict[str, str]] = {

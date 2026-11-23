@@ -32,11 +32,11 @@ if not exist "%ISCC_PATH%" set "ISCC_PATH=C:\Program Files\Inno Setup 6\ISCC.exe
 
 "%ISCC_PATH%" setup.iss
 
-if exist "dist_installer\FalconDM-Setup-v2.8.1.exe" (
+if exist "dist_installer\FalconDM-Setup-v2.8.2.exe" (
     echo.
     echo ========================================================
     echo   [SUCCESS] FalconDM Setup Installer created!
-    echo   File: dist_installer\FalconDM-Setup-v2.8.1.exe
+    echo   File: dist_installer\FalconDM-Setup-v2.8.2.exe
     echo ========================================================
 ) else (
     echo [ERROR] Inno Setup compilation failed!
