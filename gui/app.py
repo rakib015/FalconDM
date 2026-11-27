@@ -662,9 +662,13 @@ class FalconDMApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("FalconDM v2.8.2 - High Speed Turbo Download Accelerator (Free IDM)")
-        self.geometry("1220x780")
-        self.minsize(1040, 660)
+        self.title("FalconDM v2.8.3 - High Speed Turbo Download Accelerator")
+        self.geometry("1260x800")
+        self.minsize(1060, 680)
+        try:
+            self.configure(fg_color="#060911")
+        except Exception:
+            pass
 
         # State manager
         self.manager = DownloadManager()
@@ -768,6 +772,10 @@ class FalconDMApp(ctk.CTk):
         self.bind("<Control-Q>", lambda e: self._on_quick_look())
         self.bind("<Control-g>", lambda e: self._on_toggle_mirror_acceleration())
         self.bind("<Control-G>", lambda e: self._on_toggle_mirror_acceleration())
+        self.bind("<Control-v>", self._on_paste_shortcut)
+        self.bind("<Control-V>", self._on_paste_shortcut)
+        self.bind("<Delete>", lambda e: self._on_click_delete() if self.focus_get() != getattr(self, "search_entry", None) else None)
+        self.bind("<space>", lambda e: self._on_quick_look() if self.focus_get() != getattr(self, "search_entry", None) and self.selected_task_id else None)
         if hasattr(self, 'tree'):
             self.tree.bind("<Delete>", lambda e: self._on_click_delete())
             def _handle_space(e):
@@ -882,61 +890,120 @@ class FalconDMApp(ctk.CTk):
             )
         if hasattr(self, "header_speed_lbl"):
             self.header_speed_lbl.configure(text_color=palette["accent"])
+        if hasattr(self, "lbl_version_pill"):
+            self.lbl_version_pill.configure(fg_color=palette["badge_bg"], text_color=palette["accent"])
+        if hasattr(self, "btn_theme_pill"):
+            self.btn_theme_pill.configure(text=f"🎨 {config_store.get('ui_theme_accent', 'Cyberpunk Cyan')} ▾")
+        if hasattr(self, "active_category"):
+            self._on_select_category(self.active_category)
         self._refresh_table()
         self._draw_speed_graph()
 
+    def _on_paste_shortcut(self, event=None):
+        """Ctrl+V anywhere in main window (outside search box) opens Add Download with clipboard URL."""
+        try:
+            focused = self.focus_get()
+            if focused is not None and str(focused).endswith("entry"):
+                return
+            clip = self._safe_get_clipboard()
+            if clip and any(clip.strip().lower().startswith(p) for p in ("http://", "https://", "ftp://", "magnet:", "thunder://", "flashget://", "qqdl://")):
+                self._on_click_add_url(prefill_url=clip.strip())
+        except Exception:
+            pass
+
+    def _open_theme_menu(self):
+        menu = tk.Menu(self, tearoff=0, bg="#0f172a", fg="#e2e8f0", activebackground="#1e293b", activeforeground="#ffffff", bd=1)
+        current = config_store.get("ui_theme_accent", "Cyberpunk Cyan")
+        for theme_name in THEME_PALETTES.keys():
+            prefix = "✓ " if theme_name == current else "   "
+            menu.add_command(
+                label=f"{prefix}{theme_name}",
+                command=lambda tn=theme_name: self.apply_theme_accent(tn)
+            )
+        try:
+            x = self.btn_theme_pill.winfo_rootx()
+            y = self.btn_theme_pill.winfo_rooty() + self.btn_theme_pill.winfo_height() + 4
+            menu.post(x, y)
+        except Exception:
+            pass
+
     def _build_header_bar(self):
-        header = ctk.CTkFrame(self, fg_color="#0b0f19", height=54, corner_radius=12, border_width=1, border_color="#1e293b")
-        header.pack(fill="x", padx=12, pady=(10, 6))
+        palette = self.get_theme_palette()
+        header = ctk.CTkFrame(self, fg_color="#0b111e", height=58, corner_radius=14, border_width=1, border_color="#1b263b")
+        header.pack(fill="x", padx=14, pady=(12, 6))
         header.pack_propagate(False)
 
         # Left brand cluster
         brand_frame = ctk.CTkFrame(header, fg_color="transparent")
         brand_frame.pack(side="left", padx=14, pady=6)
 
-        badge_box = ctk.CTkFrame(brand_frame, width=34, height=34, corner_radius=9, fg_color="#1e1b4b", border_width=1, border_color="#4f46e5")
+        badge_box = ctk.CTkFrame(brand_frame, width=36, height=36, corner_radius=10, fg_color=palette["badge_bg"], border_width=1, border_color=palette["primary"])
         badge_box.pack(side="left", padx=(0, 10))
         badge_box.pack_propagate(False)
-        ctk.CTkLabel(badge_box, text="⚡", font=ctk.CTkFont(size=17), text_color="#38bdf8").place(relx=0.5, rely=0.5, anchor="center")
+        ctk.CTkLabel(badge_box, text="🦅", font=ctk.CTkFont(size=18)).place(relx=0.5, rely=0.5, anchor="center")
 
         brand_text_box = ctk.CTkFrame(brand_frame, fg_color="transparent")
-        brand_text_box.pack(side="left", padx=(0, 12))
-        lbl_logo = ctk.CTkLabel(brand_text_box, text="FalconDM v2.8.2", font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"), text_color="#f8fafc")
-        lbl_logo.pack(anchor="w")
-        lbl_tagline = ctk.CTkLabel(brand_text_box, text="TURBO ENGINE • 32X ACCELERATOR", font=ctk.CTkFont(family="Segoe UI", size=8, weight="bold"), text_color="#818cf8")
-        lbl_tagline.pack(anchor="w", pady=(0, 0))
+        brand_text_box.pack(side="left", padx=(0, 10))
+        title_row = ctk.CTkFrame(brand_text_box, fg_color="transparent")
+        title_row.pack(anchor="w")
+        ctk.CTkLabel(title_row, text="FalconDM", font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"), text_color="#f8fafc").pack(side="left")
+        self.lbl_version_pill = ctk.CTkLabel(
+            title_row,
+            text="v2.8.3",
+            font=ctk.CTkFont(size=9, weight="bold"),
+            fg_color=palette["badge_bg"],
+            text_color=palette["accent"],
+            corner_radius=6,
+            padx=6,
+            pady=1
+        )
+        self.lbl_version_pill.pack(side="left", padx=(6, 0))
+        ctk.CTkLabel(brand_text_box, text="TURBO MULTI-STREAM ACCELERATOR", font=ctk.CTkFont(family="Segoe UI", size=8, weight="bold"), text_color="#64748b").pack(anchor="w")
 
         lbl_status = ctk.CTkLabel(
             brand_frame,
-            text="● READY (:9666)",
+            text="● READY :9666",
             font=ctk.CTkFont(size=9, weight="bold"),
             text_color="#34d399",
-            fg_color="#062e1c",
+            fg_color="#052e16",
             corner_radius=10,
             padx=9,
             pady=3
         )
-        lbl_status.pack(side="left")
+        lbl_status.pack(side="left", padx=(4, 0))
 
-        # Center search bar
-        search_frame = ctk.CTkFrame(header, fg_color="transparent")
-        search_frame.pack(side="left", fill="x", expand=True, padx=20, pady=8)
+        # Center search bar with clear button
+        search_frame = ctk.CTkFrame(header, fg_color="#060911", corner_radius=10, border_width=1, border_color="#1b263b", height=36)
+        search_frame.pack(side="left", fill="x", expand=True, padx=18, pady=10)
+        search_frame.pack_propagate(False)
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
-            placeholder_text="🔍 Search downloads (Name, Extension, Category, URL)...",
+            placeholder_text="🔍 Search downloads by name, type, URL... (Ctrl+F)",
             textvariable=self.search_var,
             height=34,
             corner_radius=8,
-            fg_color="#070a12",
-            border_width=1,
-            border_color="#1e293b",
+            fg_color="transparent",
+            border_width=0,
             text_color="#f8fafc",
             placeholder_text_color="#64748b",
             font=ctk.CTkFont(size=11)
         )
-        self.search_entry.pack(fill="x", expand=True)
-        self.search_var.trace_add("write", lambda *args: self._refresh_table())
+        self.search_entry.pack(side="left", fill="both", expand=True, padx=(8, 2))
+
+        self.btn_clear_search = ctk.CTkButton(
+            search_frame,
+            text="✕",
+            width=26,
+            height=26,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color="#1b263b",
+            text_color="#64748b",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=lambda: self.search_var.set("")
+        )
+        self.search_var.trace_add("write", lambda *args: self._on_search_changed())
 
         # Right status & utilities
         right_header = ctk.CTkFrame(header, fg_color="transparent")
@@ -946,8 +1013,8 @@ class FalconDMApp(ctk.CTk):
             right_header,
             text="⚡ 0.0 KB/s",
             font=ctk.CTkFont(size=11, weight="bold"),
-            text_color="#38bdf8",
-            fg_color="#0c1b30",
+            text_color=palette["accent"],
+            fg_color="#071324",
             corner_radius=8,
             padx=12,
             pady=5,
@@ -956,17 +1023,33 @@ class FalconDMApp(ctk.CTk):
         self.header_speed_lbl.pack(side="left", padx=(0, 8))
         self.header_speed_lbl.bind("<Button-1>", lambda e: self._on_click_speed_hud())
 
-        btn_remote = ctk.CTkButton(
+        self.btn_theme_pill = ctk.CTkButton(
             right_header,
-            text="🌐 Web Remote",
-            width=105,
+            text=f"🎨 {config_store.get('ui_theme_accent', 'Cyberpunk Cyan')} ▾",
+            width=135,
             height=32,
             corner_radius=8,
-            fg_color="#111827",
-            hover_color="#1f2937",
+            fg_color="#131c2e",
+            hover_color="#1e293b",
             border_width=1,
-            border_color="#374151",
-            text_color="#e5e7eb",
+            border_color="#26344d",
+            text_color="#e2e8f0",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=self._open_theme_menu
+        )
+        self.btn_theme_pill.pack(side="left", padx=(0, 6))
+
+        btn_remote = ctk.CTkButton(
+            right_header,
+            text="🌐 Remote",
+            width=84,
+            height=32,
+            corner_radius=8,
+            fg_color="#131c2e",
+            hover_color="#1e293b",
+            border_width=1,
+            border_color="#26344d",
+            text_color="#e2e8f0",
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._on_click_web_remote
         )
@@ -978,30 +1061,39 @@ class FalconDMApp(ctk.CTk):
             width=34,
             height=32,
             corner_radius=8,
-            fg_color="#111827",
-            hover_color="#1f2937",
+            fg_color="#131c2e",
+            hover_color="#1e293b",
             border_width=1,
-            border_color="#374151",
-            text_color="#e5e7eb",
+            border_color="#26344d",
+            text_color="#e2e8f0",
             font=ctk.CTkFont(size=13),
             command=self._on_click_settings
         )
         btn_settings.pack(side="left")
 
+    def _on_search_changed(self):
+        q = self.search_var.get()
+        if hasattr(self, "btn_clear_search"):
+            if q and not self.btn_clear_search.winfo_ismapped():
+                self.btn_clear_search.pack(side="right", padx=4)
+            elif not q and self.btn_clear_search.winfo_ismapped():
+                self.btn_clear_search.pack_forget()
+        self._refresh_table()
+
     def _build_toolbar(self):
-        toolbar = ctk.CTkFrame(self, fg_color="#0b0f19", height=50, corner_radius=12, border_width=1, border_color="#1e293b")
-        toolbar.pack(fill="x", padx=12, pady=(0, 6))
+        toolbar = ctk.CTkFrame(self, fg_color="#0b111e", height=52, corner_radius=14, border_width=1, border_color="#1b263b")
+        toolbar.pack(fill="x", padx=14, pady=(0, 8))
         toolbar.pack_propagate(False)
 
         palette = self.get_theme_palette()
 
-        # 1. Primary Action: Add URL
+        # 1. Primary CTA: Add Download
         self.btn_add = ctk.CTkButton(
             toolbar,
             text="➕ New Download",
-            width=145,
+            width=142,
             height=34,
-            corner_radius=8,
+            corner_radius=9,
             fg_color=palette["primary"],
             hover_color=palette["primary_hover"],
             border_width=1,
@@ -1010,13 +1102,13 @@ class FalconDMApp(ctk.CTk):
             text_color="#ffffff",
             command=self._on_click_add_url
         )
-        self.btn_add.pack(side="left", padx=(8, 6), pady=8)
+        self.btn_add.pack(side="left", padx=(10, 8), pady=9)
 
-        # 2. Core Task Controls with modern semantic hues
+        # 2. Task Actions
         self.btn_resume = ctk.CTkButton(
             toolbar,
-            text="▶ Resume",
-            width=82,
+            text="▶ Start",
+            width=76,
             height=32,
             corner_radius=8,
             fg_color="#064e3b",
@@ -1027,7 +1119,7 @@ class FalconDMApp(ctk.CTk):
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._on_click_resume
         )
-        self.btn_resume.pack(side="left", padx=2, pady=8)
+        self.btn_resume.pack(side="left", padx=3, pady=9)
 
         self.btn_pause = ctk.CTkButton(
             toolbar,
@@ -1043,7 +1135,7 @@ class FalconDMApp(ctk.CTk):
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._on_click_pause
         )
-        self.btn_pause.pack(side="left", padx=2, pady=8)
+        self.btn_pause.pack(side="left", padx=3, pady=9)
 
         self.btn_delete = ctk.CTkButton(
             toolbar,
@@ -1059,7 +1151,7 @@ class FalconDMApp(ctk.CTk):
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._on_click_delete
         )
-        self.btn_delete.pack(side="left", padx=2, pady=8)
+        self.btn_delete.pack(side="left", padx=3, pady=9)
 
         btn_open = ctk.CTkButton(
             toolbar,
@@ -1067,43 +1159,24 @@ class FalconDMApp(ctk.CTk):
             width=76,
             height=32,
             corner_radius=8,
-            fg_color="#111827",
-            hover_color="#1f2937",
+            fg_color="#131c2e",
+            hover_color="#1e293b",
             border_width=1,
-            border_color="#374151",
-            text_color="#e5e7eb",
+            border_color="#26344d",
+            text_color="#e2e8f0",
             font=ctk.CTkFont(size=11),
             command=self._on_click_open_folder
         )
-        btn_open.pack(side="left", padx=2, pady=8)
+        btn_open.pack(side="left", padx=3, pady=9)
 
         # Divider
-        div = ctk.CTkFrame(toolbar, width=1, height=22, fg_color="#1e293b")
-        div.pack(side="left", padx=8, pady=13)
+        ctk.CTkFrame(toolbar, width=1, height=24, fg_color="#1b263b").pack(side="left", padx=8, pady=14)
 
-        # 3. Supercharged Tools Dropdown Menu
-        self.btn_tools = ctk.CTkButton(
+        # 3. Quick Media & Power Tools
+        btn_grab = ctk.CTkButton(
             toolbar,
-            text="🛠️ Tools  ▾",
-            width=92,
-            height=32,
-            corner_radius=8,
-            fg_color="#111827",
-            hover_color="#1f2937",
-            border_width=1,
-            border_color="#374151",
-            text_color="#e5e7eb",
-            font=ctk.CTkFont(size=11),
-            command=self._open_tools_menu
-        )
-        self.btn_tools.pack(side="left", padx=2, pady=8)
-
-        # 4. Quick Look Preview Button
-        self.btn_quick_look = ctk.CTkButton(
-            toolbar,
-            text="👁️ Quick Look",
-            width=100,
-            command=self._on_quick_look,
+            text="🎬 Grab Video",
+            width=98,
             height=32,
             corner_radius=8,
             fg_color="#172554",
@@ -1111,33 +1184,31 @@ class FalconDMApp(ctk.CTk):
             border_width=1,
             border_color="#2563eb",
             text_color="#93c5fd",
-            font=ctk.CTkFont(size=11, weight="bold")
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._on_click_grab_video
         )
-        self.btn_quick_look.pack(side="left", padx=2, pady=8)
+        btn_grab.pack(side="left", padx=3, pady=9)
 
-        # 5. Live Speed HUD Button
-        self.btn_hud = ctk.CTkButton(
+        self.btn_quick_look = ctk.CTkButton(
             toolbar,
-            text="📈 Speed HUD",
-            width=100,
-            command=self._on_click_speed_hud,
+            text="👁️ Quick Look",
+            width=96,
             height=32,
             corner_radius=8,
-            fg_color="#082f49",
-            hover_color="#075985",
+            fg_color="#131c2e",
+            hover_color="#1e293b",
             border_width=1,
-            border_color="#0284c7",
-            text_color="#38bdf8",
-            font=ctk.CTkFont(size=11, weight="bold")
+            border_color="#26344d",
+            text_color="#cbd5e1",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._on_quick_look
         )
-        self.btn_hud.pack(side="left", padx=2, pady=8)
+        self.btn_quick_look.pack(side="left", padx=3, pady=9)
 
-        # 6. AI Agent / Natural Language Downloader Button
         self.btn_ai = ctk.CTkButton(
             toolbar,
             text="✨ AI Agent",
-            width=92,
-            command=self._open_ai_agent,
+            width=88,
             height=32,
             corner_radius=8,
             fg_color="#2e1065",
@@ -1145,25 +1216,42 @@ class FalconDMApp(ctk.CTk):
             border_width=1,
             border_color="#7c3aed",
             text_color="#c084fc",
-            font=ctk.CTkFont(size=11, weight="bold")
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._open_ai_agent
         )
-        self.btn_ai.pack(side="left", padx=2, pady=8)
+        self.btn_ai.pack(side="left", padx=3, pady=9)
+
+        self.btn_tools = ctk.CTkButton(
+            toolbar,
+            text="🛠️ Tools ▾",
+            width=84,
+            height=32,
+            corner_radius=8,
+            fg_color="#131c2e",
+            hover_color="#1e293b",
+            border_width=1,
+            border_color="#26344d",
+            text_color="#e2e8f0",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._open_tools_menu
+        )
+        self.btn_tools.pack(side="left", padx=3, pady=9)
 
         # Right-side controls: Clipboard Sniff Switch & Speed Limiter
         right_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        right_frame.pack(side="right", padx=10, pady=7)
+        right_frame.pack(side="right", padx=12, pady=8)
 
         switch_clip = ctk.CTkSwitch(
             right_frame,
-            text="Sniffer",
+            text="Auto-Sniff",
             variable=self.clipboard_sniff_enabled,
             command=self._on_toggle_clipboard_sniff,
-            progress_color="#2563eb",
+            progress_color=palette["primary"],
             font=ctk.CTkFont(size=11)
         )
         switch_clip.pack(side="left", padx=(0, 12))
 
-        ctk.CTkLabel(right_frame, text="Speed:", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(side="left", padx=(0, 4))
+        ctk.CTkLabel(right_frame, text="Limit:", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(side="left", padx=(0, 4))
         self.speed_limiter_var = ctk.StringVar(value="Unlimited")
         combo_speed = ctk.CTkComboBox(
             right_frame,
@@ -1171,11 +1259,11 @@ class FalconDMApp(ctk.CTk):
             width=100,
             height=30,
             corner_radius=8,
-            fg_color="#161f2e",
-            button_color="#243248",
-            border_color="#202c40",
+            fg_color="#060911",
+            button_color="#1e293b",
+            border_color="#1b263b",
             text_color="#cbd5e1",
-            dropdown_fg_color="#0d131f",
+            dropdown_fg_color="#0b111e",
             variable=self.speed_limiter_var,
             command=self._on_change_speed_limit
         )
@@ -1246,30 +1334,32 @@ class FalconDMApp(ctk.CTk):
             "• Anti-Corruption Non-Range Fallback & In-Flight Demotion\n"
             "• Multi-Thread Video & Audio Stream Grabber\n"
             "• Automated Queue Scheduler & Dynamic Bandwidth Limiter\n\n"
-            "Status: v2.8.2 Active & Ready"
+            "Status: v2.8.3 Active & Ready"
         )
 
     def _build_sidebar(self):
-        sidebar = ctk.CTkFrame(self.center_frame, width=220, fg_color="#0b0f19", corner_radius=12, border_width=1, border_color="#1e293b")
+        palette = self.get_theme_palette()
+        sidebar = ctk.CTkFrame(self.center_frame, width=228, fg_color="#0b111e", corner_radius=14, border_width=1, border_color="#1b263b")
         sidebar.pack(side="left", fill="y", padx=(0, 10), pady=0)
         sidebar.pack_propagate(False)
 
-        lbl_cat = ctk.CTkLabel(sidebar, text="D A S H B O A R D", font=ctk.CTkFont(size=9, weight="bold"), text_color="#64748b")
-        lbl_cat.pack(anchor="w", padx=16, pady=(12, 4))
+        lbl_cat = ctk.CTkLabel(sidebar, text="O V E R V I E W", font=ctk.CTkFont(size=9, weight="bold"), text_color="#64748b")
+        lbl_cat.pack(anchor="w", padx=16, pady=(14, 4))
 
         self.cat_buttons = {}
         self.cat_count_labels = {}
         
         main_categories = [
             ("All Downloads", "📥 All Downloads"),
-            ("Unfinished", "⚡ In Progress"),
-            ("Finished", "✓ Completed"),
+            ("Unfinished", "⚡ Downloading"),
+            ("Finished", "✅ Completed"),
             ("Paused", "⏸ Paused / Stopped"),
+            ("Failed", "⚠️ Failed"),
         ]
 
         for cat_key, label in main_categories:
             item_row = ctk.CTkFrame(sidebar, fg_color="transparent", height=32)
-            item_row.pack(fill="x", padx=6, pady=1)
+            item_row.pack(fill="x", padx=8, pady=1)
             item_row.pack_propagate(False)
 
             is_active = (cat_key == "All Downloads")
@@ -1279,11 +1369,11 @@ class FalconDMApp(ctk.CTk):
                 anchor="w",
                 height=32,
                 corner_radius=8,
-                fg_color="#1e3a6a" if is_active else "transparent",
+                fg_color=palette["badge_bg"] if is_active else "transparent",
                 border_width=1 if is_active else 0,
-                border_color="#2563eb" if is_active else "#0d131f",
+                border_color=palette["primary"] if is_active else "#0b111e",
                 text_color="#ffffff" if is_active else "#94a3b8",
-                hover_color="#161f2e",
+                hover_color="#131c2e",
                 font=ctk.CTkFont(size=11, weight="bold" if is_active else "normal"),
                 command=lambda k=cat_key: self._on_select_category(k)
             )
@@ -1293,10 +1383,10 @@ class FalconDMApp(ctk.CTk):
             badge = ctk.CTkLabel(
                 item_row,
                 text="0",
-                width=24,
+                width=26,
                 height=18,
                 corner_radius=9,
-                fg_color="#2563eb" if is_active else "#161f2e",
+                fg_color=palette["primary"] if is_active else "#131c2e",
                 text_color="#ffffff" if is_active else "#64748b",
                 font=ctk.CTkFont(size=9, weight="bold")
             )
@@ -1304,34 +1394,34 @@ class FalconDMApp(ctk.CTk):
             self.cat_count_labels[cat_key] = badge
 
         # Media section
-        lbl_media = ctk.CTkLabel(sidebar, text="F I L E  T Y P E S", font=ctk.CTkFont(size=9, weight="bold"), text_color="#64748b")
-        lbl_media.pack(anchor="w", padx=16, pady=(12, 4))
+        lbl_media = ctk.CTkLabel(sidebar, text="C A T E G O R I E S", font=ctk.CTkFont(size=9, weight="bold"), text_color="#64748b")
+        lbl_media.pack(anchor="w", padx=16, pady=(14, 4))
 
         media_categories = [
             ("Video", "🎬 Videos"),
             ("Audio", "🎵 Audio"),
             ("Image", "🖼️ Images"),
-            ("Compressed", "📦 Compressed"),
+            ("Compressed", "📦 Archives"),
             ("Document", "📄 Documents"),
             ("Program", "⚙️ Programs")
         ]
 
         for cat_key, label in media_categories:
-            item_row = ctk.CTkFrame(sidebar, fg_color="transparent", height=32)
-            item_row.pack(fill="x", padx=6, pady=1)
+            item_row = ctk.CTkFrame(sidebar, fg_color="transparent", height=30)
+            item_row.pack(fill="x", padx=8, pady=1)
             item_row.pack_propagate(False)
 
             btn = ctk.CTkButton(
                 item_row,
                 text=label,
                 anchor="w",
-                height=32,
+                height=30,
                 corner_radius=8,
                 fg_color="transparent",
                 border_width=0,
-                border_color="#0d131f",
+                border_color="#0b111e",
                 text_color="#94a3b8",
-                hover_color="#161f2e",
+                hover_color="#131c2e",
                 font=ctk.CTkFont(size=11),
                 command=lambda k=cat_key: self._on_select_category(k)
             )
@@ -1341,10 +1431,10 @@ class FalconDMApp(ctk.CTk):
             badge = ctk.CTkLabel(
                 item_row,
                 text="0",
-                width=24,
+                width=26,
                 height=18,
                 corner_radius=9,
-                fg_color="#161f2e",
+                fg_color="#131c2e",
                 text_color="#64748b",
                 font=ctk.CTkFont(size=9, weight="bold")
             )
@@ -1352,26 +1442,26 @@ class FalconDMApp(ctk.CTk):
             self.cat_count_labels[cat_key] = badge
 
         # Bottom Hardware Speedometer & Waveform
-        speedo_frame = ctk.CTkFrame(sidebar, fg_color="#070a12", corner_radius=10, border_width=1, border_color="#1e293b", cursor="hand2")
+        speedo_frame = ctk.CTkFrame(sidebar, fg_color="#060911", corner_radius=12, border_width=1, border_color="#1b263b", cursor="hand2")
         speedo_frame.pack(side="bottom", fill="x", padx=8, pady=10)
         speedo_frame.bind("<Button-1>", lambda e: self._on_click_speed_hud())
 
         top_spd = ctk.CTkFrame(speedo_frame, fg_color="transparent")
-        top_spd.pack(fill="x", padx=8, pady=(8, 0))
-        lbl_tp = ctk.CTkLabel(top_spd, text="● THROUGHPUT", font=ctk.CTkFont(size=9, weight="bold"), text_color="#10b981")
+        top_spd.pack(fill="x", padx=10, pady=(8, 0))
+        lbl_tp = ctk.CTkLabel(top_spd, text="● LIVE SPEED", font=ctk.CTkFont(size=9, weight="bold"), text_color="#10b981")
         lbl_tp.pack(side="left")
         lbl_tp.bind("<Button-1>", lambda e: self._on_click_speed_hud())
-        self.lbl_peak_speed = ctk.CTkLabel(top_spd, text="Peak: 0.0 KB/s", font=ctk.CTkFont(size=8, weight="bold"), text_color="#38bdf8")
+        self.lbl_peak_speed = ctk.CTkLabel(top_spd, text="Peak: 0.0 KB/s", font=ctk.CTkFont(size=8, weight="bold"), text_color=palette["accent"])
         self.lbl_peak_speed.pack(side="right")
         self.lbl_peak_speed.bind("<Button-1>", lambda e: self._on_click_speed_hud())
 
-        self.lbl_global_speed = ctk.CTkLabel(speedo_frame, text="0.0 KB/s", font=ctk.CTkFont(size=19, weight="bold"), text_color="#38bdf8", cursor="hand2")
-        self.lbl_global_speed.pack(pady=(1, 2))
+        self.lbl_global_speed = ctk.CTkLabel(speedo_frame, text="0.0 KB/s", font=ctk.CTkFont(size=20, weight="bold"), text_color=palette["accent"], cursor="hand2")
+        self.lbl_global_speed.pack(pady=(2, 2))
         self.lbl_global_speed.bind("<Button-1>", lambda e: self._on_click_speed_hud())
         
-        # Live Waveform Graph Canvas (Cyber Obsidian glow)
-        self.speed_canvas = tk.Canvas(speedo_frame, width=188, height=48, bg="#05080e", highlightthickness=1, highlightbackground="#162030", cursor="hand2")
-        self.speed_canvas.pack(padx=6, pady=(1, 4))
+        # Live Waveform Graph Canvas
+        self.speed_canvas = tk.Canvas(speedo_frame, width=192, height=46, bg="#04070d", highlightthickness=1, highlightbackground="#162030", cursor="hand2")
+        self.speed_canvas.pack(padx=8, pady=(2, 4))
         self.speed_canvas.bind("<Button-1>", lambda e: self._on_click_speed_hud())
         self.speed_history = [0.0] * 48
         self.peak_speed_seen = 0.0
@@ -1380,23 +1470,23 @@ class FalconDMApp(ctk.CTk):
         self.lbl_active_streams.pack(pady=(0, 2))
         self.lbl_active_streams.bind("<Button-1>", lambda e: self._on_click_speed_hud())
 
-        lbl_hud_link = ctk.CTkLabel(speedo_frame, text="📊 Open Live Speed HUD ↗", font=ctk.CTkFont(size=9, weight="bold"), text_color="#38bdf8", cursor="hand2")
-        lbl_hud_link.pack(pady=(0, 6))
+        lbl_hud_link = ctk.CTkLabel(speedo_frame, text="📊 Open Live Speed HUD ↗", font=ctk.CTkFont(size=9, weight="bold"), text_color=palette["accent"], cursor="hand2")
+        lbl_hud_link.pack(pady=(0, 8))
         lbl_hud_link.bind("<Button-1>", lambda e: self._on_click_speed_hud())
 
     def _build_main_table(self):
-        self.table_container = ctk.CTkFrame(self.center_frame, fg_color="#0b0f19", corner_radius=12, border_width=1, border_color="#1e293b")
+        self.table_container = ctk.CTkFrame(self.center_frame, fg_color="#0b111e", corner_radius=14, border_width=1, border_color="#1b263b")
         self.table_container.pack(side="right", fill="both", expand=True)
 
         style = ttk.Style()
         style.theme_use("clam")
         style.configure(
             "Treeview",
-            background="#070a12",
+            background="#060911",
             foreground="#e2e8f0",
-            rowheight=38,
-            fieldbackground="#070a12",
-            bordercolor="#1e293b",
+            rowheight=42,
+            fieldbackground="#060911",
+            bordercolor="#1b263b",
             borderwidth=0,
             font=("Segoe UI", 10)
         )
@@ -1406,7 +1496,7 @@ class FalconDMApp(ctk.CTk):
             foreground="#94a3b8",
             relief="flat",
             font=("Segoe UI", 10, "bold"),
-            padding=(6, 8)
+            padding=(8, 10)
         )
         style.map("Treeview", background=[("selected", "#1e3a6a")], foreground=[("selected", "#ffffff")])
         style.map("Treeview.Heading", background=[("active", "#1e293b")], foreground=[("active", "#38bdf8")])
@@ -1414,8 +1504,8 @@ class FalconDMApp(ctk.CTk):
         columns = ("name", "size", "status", "progress", "speed", "eta", "category")
         self.tree = ttk.Treeview(self.table_container, columns=columns, show="headings", selectmode="browse")
         
-        self.tree.tag_configure("odd_row", background="#070a12")
-        self.tree.tag_configure("even_row", background="#0b101d")
+        self.tree.tag_configure("odd_row", background="#060911")
+        self.tree.tag_configure("even_row", background="#0a0f1c")
 
         self.tree.heading("name", text="File Name", command=lambda: self._on_click_column_header("name"))
         self.tree.heading("size", text="Size", command=lambda: self._on_click_column_header("size"))
@@ -1513,27 +1603,28 @@ class FalconDMApp(ctk.CTk):
         self.context_menu.add_command(label="🗑 Remove from List", command=self._on_click_delete)
 
     def _build_segment_panel(self):
-        self.segment_box = ctk.CTkFrame(self, fg_color="#0d131f", height=36, corner_radius=10, border_width=1, border_color="#1e293b")
-        self.segment_box.pack(fill="x", padx=12, pady=(0, 6))
+        palette = self.get_theme_palette()
+        self.segment_box = ctk.CTkFrame(self, fg_color="#0b111e", height=38, corner_radius=12, border_width=1, border_color="#1b263b")
+        self.segment_box.pack(fill="x", padx=14, pady=(0, 8))
         self.segment_box.pack_propagate(False)
 
         top_row = ctk.CTkFrame(self.segment_box, fg_color="transparent")
-        top_row.pack(fill="x", padx=14, pady=(6, 4))
+        top_row.pack(fill="x", padx=12, pady=(6, 4))
 
-        # Bottom panel mode: "graph" (default) or "segments"
+        # Bottom panel mode: "graph", "segments", or "details"
         self.bottom_panel_mode = "graph"
 
-        mode_box = ctk.CTkFrame(top_row, fg_color="#141c2c", corner_radius=6, border_width=1, border_color="#1f2c42")
-        mode_box.pack(side="left", padx=(0, 10))
+        mode_box = ctk.CTkFrame(top_row, fg_color="#060911", corner_radius=8, border_width=1, border_color="#1b263b")
+        mode_box.pack(side="left", padx=(0, 12))
 
         self.btn_mode_graph = ctk.CTkButton(
             mode_box,
             text="📈 Live Speed Curve",
-            width=135,
-            height=22,
-            corner_radius=4,
-            fg_color="#2563eb",
-            hover_color="#1d4ed8",
+            width=128,
+            height=24,
+            corner_radius=6,
+            fg_color=palette["primary"],
+            hover_color=palette["primary_hover"],
             text_color="#ffffff",
             font=ctk.CTkFont(size=10, weight="bold"),
             command=lambda: self._set_bottom_mode("graph")
@@ -1543,16 +1634,30 @@ class FalconDMApp(ctk.CTk):
         self.btn_mode_segments = ctk.CTkButton(
             mode_box,
             text="🧩 Connection Chunks",
-            width=135,
-            height=22,
-            corner_radius=4,
+            width=132,
+            height=24,
+            corner_radius=6,
             fg_color="transparent",
-            hover_color="#1f2c42",
+            hover_color="#131c2e",
             text_color="#94a3b8",
             font=ctk.CTkFont(size=10, weight="bold"),
             command=lambda: self._set_bottom_mode("segments")
         )
         self.btn_mode_segments.pack(side="left", padx=2, pady=2)
+
+        self.btn_mode_details = ctk.CTkButton(
+            mode_box,
+            text="ℹ️ Task Details",
+            width=110,
+            height=24,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color="#131c2e",
+            text_color="#94a3b8",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=lambda: self._set_bottom_mode("details")
+        )
+        self.btn_mode_details.pack(side="left", padx=2, pady=2)
 
         self.lbl_segment_title = ctk.CTkLabel(
             top_row,
@@ -1565,14 +1670,14 @@ class FalconDMApp(ctk.CTk):
         self.btn_toggle_segments = ctk.CTkButton(
             top_row,
             text="▼ Expand",
-            width=76,
-            height=22,
+            width=80,
+            height=24,
             corner_radius=6,
-            fg_color="#161f2e",
-            hover_color="#243248",
+            fg_color="#131c2e",
+            hover_color="#1e293b",
             border_width=1,
-            border_color="#202c40",
-            text_color="#38bdf8",
+            border_color="#26344d",
+            text_color=palette["accent"],
             font=ctk.CTkFont(size=10, weight="bold"),
             command=self._toggle_segment_panel
         )
@@ -1584,9 +1689,9 @@ class FalconDMApp(ctk.CTk):
         self.main_speed_canvas = tk.Canvas(
             self.bottom_content_frame,
             height=100,
-            bg="#060910",
+            bg="#060911",
             highlightthickness=1,
-            highlightbackground="#182338",
+            highlightbackground="#1b263b",
             cursor="crosshair"
         )
 
@@ -1594,46 +1699,97 @@ class FalconDMApp(ctk.CTk):
         self.main_segment_map_canvas = tk.Canvas(
             self.bottom_content_frame,
             height=20,
-            bg="#060910",
+            bg="#060911",
             highlightthickness=1,
-            highlightbackground="#182338"
+            highlightbackground="#1b263b"
         )
+
+        # Task Details Inspector Frame
+        self.details_inspector_frame = ctk.CTkFrame(self.bottom_content_frame, fg_color="#060911", corner_radius=8, border_width=1, border_color="#1b263b")
+        info_col = ctk.CTkFrame(self.details_inspector_frame, fg_color="transparent")
+        info_col.pack(side="left", fill="both", expand=True, padx=12, pady=8)
+
+        self.lbl_insp_name = ctk.CTkLabel(info_col, text="Select a download to inspect its details", font=ctk.CTkFont(size=12, weight="bold"), text_color="#f8fafc", anchor="w")
+        self.lbl_insp_name.pack(fill="x")
+        self.lbl_insp_meta = ctk.CTkLabel(info_col, text="Size: --  •  Connections: --  •  Category: --", font=ctk.CTkFont(size=10), text_color="#94a3b8", anchor="w")
+        self.lbl_insp_meta.pack(fill="x", pady=(2, 2))
+        self.lbl_insp_path = ctk.CTkLabel(info_col, text="Save Path: --", font=ctk.CTkFont(size=10), text_color="#64748b", anchor="w")
+        self.lbl_insp_path.pack(fill="x")
+        self.lbl_insp_url = ctk.CTkLabel(info_col, text="Source URL: --", font=ctk.CTkFont(size=10), text_color="#38bdf8", anchor="w")
+        self.lbl_insp_url.pack(fill="x")
+
+        act_col = ctk.CTkFrame(self.details_inspector_frame, fg_color="transparent")
+        act_col.pack(side="right", padx=12, pady=8)
+        ctk.CTkButton(act_col, text="🚀 Open File", width=110, height=28, corner_radius=6, fg_color=palette["primary"], hover_color=palette["primary_hover"], font=ctk.CTkFont(size=10, weight="bold"), command=self._on_context_open_file).pack(pady=2)
+        ctk.CTkButton(act_col, text="📁 Open Folder", width=110, height=28, corner_radius=6, fg_color="#131c2e", hover_color="#1e293b", border_width=1, border_color="#26344d", font=ctk.CTkFont(size=10, weight="bold"), command=self._on_click_open_folder).pack(pady=2)
+        ctk.CTkButton(act_col, text="📋 Copy URL", width=110, height=26, corner_radius=6, fg_color="#131c2e", hover_color="#1e293b", border_width=1, border_color="#26344d", font=ctk.CTkFont(size=10), command=self._on_copy_link).pack(pady=2)
 
         self.seg_scroll = None
         self.seg_widgets = []
 
+    def _update_details_inspector(self):
+        if not hasattr(self, "lbl_insp_name"):
+            return
+        task = self.manager.tasks.get(self.selected_task_id) if self.selected_task_id else None
+        if not task:
+            self.lbl_insp_name.configure(text="Select a download to inspect its details")
+            self.lbl_insp_meta.configure(text="Size: --  •  Connections: --  •  Category: --")
+            self.lbl_insp_path.configure(text="Save Path: --")
+            self.lbl_insp_url.configure(text="Source URL: --")
+            return
+        size_s = format_bytes(task.file_size) if task.file_size > 0 else "Unknown"
+        mirrors_cnt = len(getattr(task, "mirrors", []) or [])
+        mirror_txt = f"  •  Mirrors: {mirrors_cnt}" if mirrors_cnt else ""
+        self.lbl_insp_name.configure(text=f"{get_file_icon(task.filename, task.category)}{task.filename}")
+        self.lbl_insp_meta.configure(text=f"Status: {task.status}  •  Size: {size_s}  •  Threads: {getattr(task, 'num_connections', 8)}  •  Category: {task.category}{mirror_txt}")
+        self.lbl_insp_path.configure(text=f"Save Path: {task.save_path}")
+        url_disp = task.url if len(task.url) <= 105 else task.url[:102] + "..."
+        self.lbl_insp_url.configure(text=f"Source URL: {url_disp}")
+
     def _set_bottom_mode(self, mode: str):
         self.bottom_panel_mode = mode
+        palette = self.get_theme_palette()
+        for b, m in [(self.btn_mode_graph, "graph"), (self.btn_mode_segments, "segments"), (self.btn_mode_details, "details")]:
+            if m == mode:
+                b.configure(fg_color=palette["primary"], text_color="#ffffff")
+            else:
+                b.configure(fg_color="transparent", text_color="#94a3b8")
+
+        if self.segment_panel_collapsed:
+            self._toggle_segment_panel()
+            return
+
+        if self.seg_scroll:
+            self.seg_scroll.pack_forget()
+        if hasattr(self, 'main_segment_map_canvas'):
+            self.main_segment_map_canvas.pack_forget()
+        if hasattr(self, 'main_speed_canvas'):
+            self.main_speed_canvas.pack_forget()
+        if hasattr(self, 'details_inspector_frame'):
+            self.details_inspector_frame.pack_forget()
+
         if mode == "graph":
-            self.btn_mode_graph.configure(fg_color="#2563eb", text_color="#ffffff")
-            self.btn_mode_segments.configure(fg_color="transparent", text_color="#94a3b8")
-            if not self.segment_panel_collapsed:
-                if self.seg_scroll:
-                    self.seg_scroll.pack_forget()
-                if hasattr(self, 'main_segment_map_canvas'):
-                    self.main_segment_map_canvas.pack_forget()
-                self.main_speed_canvas.pack(fill="both", expand=True, padx=8, pady=(0, 6))
-                self._draw_speed_graph()
-        else:
-            self.btn_mode_segments.configure(fg_color="#2563eb", text_color="#ffffff")
-            self.btn_mode_graph.configure(fg_color="transparent", text_color="#94a3b8")
-            if not self.segment_panel_collapsed:
-                self.main_speed_canvas.pack_forget()
-                if hasattr(self, 'main_segment_map_canvas'):
-                    self.main_segment_map_canvas.pack(fill="x", padx=8, pady=(0, 4))
-                if self.seg_scroll is None:
-                    self.seg_scroll = ctk.CTkScrollableFrame(self.bottom_content_frame, orientation="horizontal", fg_color="transparent", height=66)
-                self.seg_scroll.pack(fill="both", expand=True, padx=8, pady=(0, 6))
-                self._update_segment_monitor()
+            self.main_speed_canvas.pack(fill="both", expand=True, padx=8, pady=(0, 6))
+            self._draw_speed_graph()
+        elif mode == "segments":
+            if hasattr(self, 'main_segment_map_canvas'):
+                self.main_segment_map_canvas.pack(fill="x", padx=8, pady=(0, 4))
+            if self.seg_scroll is None:
+                self.seg_scroll = ctk.CTkScrollableFrame(self.bottom_content_frame, orientation="horizontal", fg_color="transparent", height=66)
+            self.seg_scroll.pack(fill="both", expand=True, padx=8, pady=(0, 6))
+            self._update_segment_monitor()
+        elif mode == "details":
+            self.details_inspector_frame.pack(fill="both", expand=True, padx=8, pady=(0, 6))
+            self._update_details_inspector()
 
     def _toggle_segment_panel(self):
         if not self.segment_panel_collapsed:
-            self.segment_box.configure(height=36)
+            self.segment_box.configure(height=38)
             self.bottom_content_frame.pack_forget()
             self.btn_toggle_segments.configure(text="▼ Expand")
             self.segment_panel_collapsed = True
         else:
-            self.segment_box.configure(height=148)
+            self.segment_box.configure(height=154)
             self.bottom_content_frame.pack(fill="both", expand=True, padx=8, pady=(0, 6))
             self.btn_toggle_segments.configure(text="▲ Collapse")
             self.segment_panel_collapsed = False
@@ -2605,11 +2761,12 @@ class FalconDMApp(ctk.CTk):
 
     def _on_select_category(self, cat_key: str):
         self.active_category = cat_key
+        palette = self.get_theme_palette()
         for k, btn in self.cat_buttons.items():
             if k == cat_key:
-                btn.configure(fg_color="#172554", border_width=1, border_color="#3b82f6", text_color="#ffffff", font=ctk.CTkFont(size=11, weight="bold"))
+                btn.configure(fg_color=palette["badge_bg"], border_width=1, border_color=palette["primary"], text_color="#ffffff", font=ctk.CTkFont(size=11, weight="bold"))
             else:
-                btn.configure(fg_color="transparent", border_width=0, border_color="#0b0f19", text_color="#94a3b8", font=ctk.CTkFont(size=11, weight="normal"))
+                btn.configure(fg_color="transparent", border_width=0, border_color="#0b111e", text_color="#94a3b8", font=ctk.CTkFont(size=11, weight="normal"))
         self._refresh_table()
 
     def _on_tree_select(self, event):
@@ -2617,6 +2774,8 @@ class FalconDMApp(ctk.CTk):
         if selected:
             self.selected_task_id = selected[0]
             self._update_segment_monitor()
+            if hasattr(self, "_update_details_inspector"):
+                self._update_details_inspector()
 
     def _on_context_open_file(self):
         if not self.selected_task_id:
@@ -2794,13 +2953,15 @@ class FalconDMApp(ctk.CTk):
         total_count = len(tasks)
         unfin_count = len([t for t in tasks if t.status != DownloadTask.STATUS_COMPLETED])
         fin_count = len([t for t in tasks if t.status == DownloadTask.STATUS_COMPLETED])
-        paused_count = len([t for t in tasks if t.status in (DownloadTask.STATUS_PAUSED, DownloadTask.STATUS_ERROR)])
+        paused_count = len([t for t in tasks if t.status in (DownloadTask.STATUS_PAUSED, DownloadTask.STATUS_QUEUED)])
+        failed_count = len([t for t in tasks if t.status == DownloadTask.STATUS_ERROR])
 
         counts_map = {
             "All Downloads": total_count,
             "Unfinished": unfin_count,
             "Finished": fin_count,
             "Paused": paused_count,
+            "Failed": failed_count,
             "Video": len([t for t in tasks if t.category.lower() == "video"]),
             "Audio": len([t for t in tasks if t.category.lower() == "audio"]),
             "Image": len([t for t in tasks if t.category.lower() == "image"]),
@@ -2814,6 +2975,7 @@ class FalconDMApp(ctk.CTk):
             "Unfinished": ("#065f46", "#6ee7b7"),
             "Finished": ("#14532d", "#86efac"),
             "Paused": ("#78350f", "#fcd34d"),
+            "Failed": ("#7f1d1d", "#fca5a5"),
             "Video": ("#312e81", "#a5b4fc"),
             "Audio": ("#4c1d95", "#d8b4fe"),
             "Image": ("#064e3b", "#6ee7b7"),
@@ -2822,6 +2984,7 @@ class FalconDMApp(ctk.CTk):
             "Program": ("#1e3a8a", "#93c5fd"),
         }
 
+        palette = self.get_theme_palette()
         for k, lbl in self.cat_count_labels.items():
             cnt = counts_map.get(k, 0)
             is_active = (k == self.active_category)
@@ -2832,7 +2995,7 @@ class FalconDMApp(ctk.CTk):
 
             lbl.configure(text=str(cnt))
             if is_active:
-                lbl.configure(fg_color="#3b82f6", text_color="#ffffff")
+                lbl.configure(fg_color=palette["primary"], text_color="#ffffff")
             elif cnt > 0:
                 bg_col, txt_col = category_colors.get(k, ("#1e293b", "#cbd5e1"))
                 lbl.configure(fg_color=bg_col, text_color=txt_col)
@@ -2845,7 +3008,9 @@ class FalconDMApp(ctk.CTk):
         elif self.active_category == "Finished":
             filtered = [t for t in tasks if t.status == DownloadTask.STATUS_COMPLETED]
         elif self.active_category == "Paused":
-            filtered = [t for t in tasks if t.status in (DownloadTask.STATUS_PAUSED, DownloadTask.STATUS_ERROR)]
+            filtered = [t for t in tasks if t.status in (DownloadTask.STATUS_PAUSED, DownloadTask.STATUS_QUEUED)]
+        elif self.active_category == "Failed":
+            filtered = [t for t in tasks if t.status == DownloadTask.STATUS_ERROR]
         elif self.active_category != "All Downloads":
             filtered = [t for t in tasks if t.category.lower() == self.active_category.lower()]
         else:

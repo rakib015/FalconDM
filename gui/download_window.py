@@ -85,6 +85,8 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
         self._computed_md5 = ""
         self._hash_thread_started = False
         self._completion_card_shown = False
+        self._opened_when_done = False
+        self._shutdown_triggered = False
 
         self._build_ui()
         self._start_tick()
@@ -987,7 +989,7 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
                 else:
                     bar.configure(progress_color="#64748b")
 
-            # Check completion actions
+            # Check completion actions (one-shot guarded)
             if self.task.status == "Completed":
                 if self.play_chime.get() and not getattr(self, "_chime_played", False):
                     self._chime_played = True
@@ -996,13 +998,15 @@ class FloatingDownloadDialog(ctk.CTkToplevel):
                         play_audio_alert("complete")
                     except Exception:
                         pass
-                if self.open_when_done.get() and os.path.exists(self.task.save_path):
+                if self.open_when_done.get() and not getattr(self, "_opened_when_done", False) and os.path.exists(self.task.save_path):
+                    self._opened_when_done = True
                     try:
                         os.startfile(self.task.save_path)
                     except Exception:
                         pass
 
-                if self.shutdown_on_complete.get():
+                if self.shutdown_on_complete.get() and not getattr(self, "_shutdown_triggered", False):
+                    self._shutdown_triggered = True
                     subprocess.run("shutdown /s /t 60", shell=True)
 
                 if self.auto_close.get():

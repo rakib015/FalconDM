@@ -737,11 +737,15 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(404, {"error": "Extension directory not found"})
 
         elif path in ('/ping', '/status', '/api/status', '/health', '/api/health', '/check', '/api/ping'):
+            try:
+                from core import __version__ as _app_ver
+            except Exception:
+                _app_ver = "2.8.3"
             self._send_json(200, {
                 "status": "ok",
                 "app": "FalconDM",
                 "name": "FalconDM",
-                "version": "2.0.0",
+                "version": _app_ver,
                 "connected": True,
                 "is_running": True
             })

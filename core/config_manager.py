@@ -78,6 +78,24 @@ THEME_PALETTES: Dict[str, Dict[str, str]] = {
         "badge_text": "#fb7185",
         "graph_fill": "#4c0519",
         "graph_line": "#f43f5e"
+    },
+    "AB Violet": {
+        "primary": "#6366f1",
+        "primary_hover": "#4f46e5",
+        "accent": "#818cf8",
+        "badge_bg": "#1e1b4b",
+        "badge_text": "#a5b4fc",
+        "graph_fill": "#1e1b4b",
+        "graph_line": "#818cf8"
+    },
+    "Midnight Slate": {
+        "primary": "#0ea5e9",
+        "primary_hover": "#0284c7",
+        "accent": "#38bdf8",
+        "badge_bg": "#0f172a",
+        "badge_text": "#7dd3fc",
+        "graph_fill": "#0c4a6e",
+        "graph_line": "#38bdf8"
     }
 }
 

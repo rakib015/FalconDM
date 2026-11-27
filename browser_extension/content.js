@@ -54,7 +54,9 @@ function extractSmartMediaTitle(media) {
     candidate = ogTitle || twitterTitle || h1 || docTitle || "";
   }
 
-  const clean = candidate.replace(/[\\/:*?"<>|\r\n\t]/g, "_").replace(/\s+/g, " ").trim();
+  let clean = candidate.replace(/[\\/:*?"<>|\r\n\t]/g, "_").replace(/\s+/g, " ").trim();
+  // Strip Facebook views/reactions prefix (e.g. "693K views · 8.8K reactions _ ")
+  clean = clean.replace(/^\d+(?:\.\d+)?[KMB]?\s*views\s*[·•|_-]\s*\d+(?:\.\d+)?[KMB]?\s*reactions\s*[·•|_-]*\s*/i, "").trim();
   if (clean.toLowerCase() === "facebook" || clean.toLowerCase() === "instagram" || clean.toLowerCase() === "video" || clean.toLowerCase() === "reel") {
     return "";
   }

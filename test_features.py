@@ -392,7 +392,7 @@ class TestFalconDMEnhancements(unittest.TestCase):
 
     def test_version_v2(self):
         import core
-        self.assertEqual(core.__version__, "2.8.2")
+        self.assertEqual(core.__version__, "2.8.3")
 
     def test_batch_manager_multidimensional_and_alpha(self):
         from core.batch_manager import BatchManager
@@ -656,11 +656,34 @@ class TestFalconDMEnhancements(unittest.TestCase):
 
         # 5. Version checks
         import core
-        self.assertEqual(core.__version__, "2.8.2")
+        self.assertEqual(core.__version__, "2.8.3")
 
         with open(os.path.join(_ROOT, "browser_extension", "manifest.json"), "r", encoding="utf-8") as f:
             m = json.load(f)
-            self.assertEqual(m["version"], "2.8.2")
+            self.assertEqual(m["version"], "2.8.3")
+
+    def test_v283_smart_link_extractor_and_themes(self):
+        """Verify v2.8.3 Smart Link Extractor (Gopeed/Hitomi inspired) and new theme palettes."""
+        from core.batch_manager import BatchManager
+        from core.config_manager import THEME_PALETTES
+
+        messy_text = """
+        Check out these files: https://example.com/archive.zip,
+        also https://example.com/video.mp4! And duplicate https://example.com/archive.zip.
+        Plus magnet:?xt=urn:btih:1234567890abcdef and thunder://QUFodHRwczovL2V4YW1wbGUuY29tL2EubXA0Wlo=
+        """
+        all_urls = BatchManager.extract_urls_from_text(messy_text)
+        self.assertEqual(len(all_urls), 4)
+        self.assertIn("https://example.com/archive.zip", all_urls)
+        self.assertIn("https://example.com/video.mp4", all_urls)
+        self.assertIn("magnet:?xt=urn:btih:1234567890abcdef", all_urls)
+        self.assertIn("thunder://QUFodHRwczovL2V4YW1wbGUuY29tL2EubXA0Wlo=", all_urls)
+
+        zips_only = BatchManager.extract_urls_from_text(messy_text, extensions=["zip"])
+        self.assertEqual(zips_only, ["https://example.com/archive.zip"])
+
+        self.assertIn("AB Violet", THEME_PALETTES)
+        self.assertIn("Midnight Slate", THEME_PALETTES)
 
 
 if __name__ == "__main__":

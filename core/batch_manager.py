@@ -55,3 +55,32 @@ class BatchManager:
             if line.startswith("http://") or line.startswith("https://"):
                 urls.append(line)
         return urls
+
+    @staticmethod
+    def extract_urls_from_text(text: str, extensions: List[str] = None) -> List[str]:
+        """
+        Smart Link Extractor (inspired by Gopeed & Hitomi-Downloader):
+        Extracts all valid download/media/magnet/legacy URLs from arbitrary messy text,
+        strips trailing punctuation, deduplicates preserving order, and optionally filters by extension.
+        """
+        if not text:
+            return []
+        pattern = re.compile(
+            r'(?:https?|ftp|thunder|flashget|qqdl)://[^\s<>"\'\]\)]+|magnet:\?xt=urn:[^\s<>"\'\]\)]+',
+            re.IGNORECASE
+        )
+        raw_matches = pattern.findall(text)
+        seen = set()
+        results = []
+        norm_exts = [e.lower().lstrip('.') for e in extensions] if extensions else None
+        for url in raw_matches:
+            cleaned = url.rstrip('.,;:!?)')
+            if not cleaned or cleaned in seen:
+                continue
+            if norm_exts:
+                path_part = cleaned.split('?', 1)[0].split('#', 1)[0].lower()
+                if not any(path_part.endswith('.' + ext) for ext in norm_exts):
+                    continue
+            seen.add(cleaned)
+            results.append(cleaned)
+        return results
